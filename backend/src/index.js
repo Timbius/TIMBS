@@ -11,9 +11,11 @@ app.use(express.json());
 
 // Импортируем маршруты
 const authRoutes = require('./routes/authRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
 
 // Подключаем маршруты
 app.use('/api/auth', authRoutes);
+app.use('/api/services', serviceRoutes);
 
 // Тестовый маршрут для проверки работы сервера
 app.get('/api/health', (req, res) => {

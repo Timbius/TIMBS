@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barber Shop</title>
+    <title>Barber Factory</title>
     <style>
         * {
             margin: 0;
@@ -17,23 +17,26 @@
 
         /* Шапка */
         .header {
-            background: #333;
+            background: #1a1a1a;
             color: white;
             padding: 15px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .logo {
             font-size: 24px;
             font-weight: bold;
+            cursor: pointer;
         }
 
         .nav a {
             color: white;
             text-decoration: none;
             margin-left: 20px;
+            cursor: pointer;
         }
 
         .nav a:hover {
@@ -45,6 +48,7 @@
             max-width: 1200px;
             margin: 40px auto;
             padding: 0 20px;
+            min-height: 60vh;
         }
 
         /* Формы */
@@ -71,16 +75,21 @@
             font-weight: bold;
         }
 
-        input {
+        input, select, textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
 
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
         button {
             width: 100%;
-            background: #333;
+            background: #1a1a1a;
             color: white;
             padding: 10px;
             border: none;
@@ -90,7 +99,7 @@
         }
 
         button:hover {
-            background: #555;
+            background: #333;
         }
 
         .message {
@@ -148,33 +157,145 @@
 
         .btn {
             display: inline-block;
-            background: #333;
+            background: #1a1a1a;
             color: white;
             padding: 12px 30px;
             text-decoration: none;
             border-radius: 5px;
             margin: 0 10px;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
         }
 
         .btn:hover {
-            background: #555;
+            background: #333;
+        }
+
+        /* Каталог услуг */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .service-card {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .service-card h3 {
+            margin-bottom: 10px;
+        }
+
+        .service-card .price {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin: 10px 0;
+        }
+
+        .service-card .category {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .service-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .service-actions button {
+            width: auto;
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+
+        .edit-btn {
+            background: #007bff;
+        }
+
+        .edit-btn:hover {
+            background: #0056b3;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        /* Форма услуги */
+        .service-form {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f4f4f4;
+            border-radius: 8px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+
+        /* Кнопки навигации */
+        .nav-buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: #6c757d;
+            width: auto;
+            padding: 8px 15px;
+        }
+
+        .nav-btn:hover {
+            background: #5a6268;
+        }
+
+        footer {
+            background: #1a1a1a;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo">Barber Factory</div>
+        <div class="logo" onclick="navigateTo('home')">Barber Factory</div>
         <div class="nav">
-            <a href="#" onclick="navigateTo('home')">Главная</a>
-            <a href="#" onclick="navigateTo('profile')" id="profileLink" style="display: none;">Профиль</a>
-            <a href="#" onclick="navigateTo('login')" id="loginLink">Вход</a>
-            <a href="#" onclick="logout()" id="logoutLink" style="display: none;">Выйти</a>
+            <a onclick="navigateTo('home')">Главная</a>
+            <a onclick="navigateTo('catalog')">Услуги</a>
+            <a onclick="navigateTo('profile')" id="profileLink" style="display: none;">Профиль</a>
+            <a onclick="navigateTo('login')" id="loginLink">Вход</a>
+            <a onclick="logout()" id="logoutLink" style="display: none;">Выйти</a>
         </div>
     </div>
 
     <div class="container" id="app">
-        <!-- Сюда будет загружаться контент -->
+        <!-- Сюда загружается контент -->
     </div>
+
+    <footer>
+        <p>Barber Factory © 2025 | Адрес: ул. Примерная, 123 | Телефон: +7 (999) 123-45-67</p>
+    </footer>
 
     <script>
         const API_URL = 'http://localhost:5000/api';
@@ -184,7 +305,18 @@
             return !!localStorage.getItem('token');
         }
 
-        // Обновление навигации в зависимости от авторизации
+        // Получить токен
+        function getToken() {
+            return localStorage.getItem('token');
+        }
+
+        // Получить пользователя
+        function getUser() {
+            const user = localStorage.getItem('user');
+            return user ? JSON.parse(user) : null;
+        }
+
+        // Обновление навигации
         function updateNavigation() {
             const isAuth = isAuthenticated();
             document.getElementById('profileLink').style.display = isAuth ? 'inline' : 'none';
@@ -200,8 +332,8 @@
             navigateTo('home');
         }
 
-        // Навигация между страницами
-        function navigateTo(page) {
+        // Навигация
+        function navigateTo(page, id = null) {
             if (page === 'home') {
                 renderHome();
             } else if (page === 'login') {
@@ -214,6 +346,12 @@
                 } else {
                     renderLogin();
                 }
+            } else if (page === 'catalog') {
+                renderCatalog();
+            } else if (page === 'serviceEdit' && id) {
+                renderServiceForm(id);
+            } else if (page === 'serviceCreate') {
+                renderServiceForm();
             }
         }
 
@@ -223,8 +361,9 @@
                 <div class="hero">
                     <h1>Добро пожаловать в Barber Factory</h1>
                     <p>Стильные стрижки, бритьё и уход за собой. Запишитесь онлайн!</p>
-                    <a href="#" class="btn" onclick="navigateTo('register')">Зарегистрироваться</a>
-                    <a href="#" class="btn" onclick="navigateTo('login')">Войти</a>
+                    <button class="btn" onclick="navigateTo('register')">Зарегистрироваться</button>
+                    <button class="btn" onclick="navigateTo('login')">Войти</button>
+                    <button class="btn" onclick="navigateTo('catalog')">Смотреть услуги</button>
                 </div>
             `;
         }
@@ -247,7 +386,7 @@
                         <div id="message"></div>
                     </form>
                     <p style="text-align: center; margin-top: 15px;">
-                        Нет аккаунта? <a href="#" onclick="navigateTo('register')">Зарегистрируйтесь</a>
+                        Нет аккаунта? <a onclick="navigateTo('register')" style="cursor: pointer; color: #1a1a1a;">Зарегистрируйтесь</a>
                     </p>
                 </div>
             `;
@@ -304,7 +443,7 @@
                         <div id="message"></div>
                     </form>
                     <p style="text-align: center; margin-top: 15px;">
-                        Уже есть аккаунт? <a href="#" onclick="navigateTo('login')">Войдите</a>
+                        Уже есть аккаунт? <a onclick="navigateTo('login')" style="cursor: pointer; color: #1a1a1a;">Войдите</a>
                     </p>
                 </div>
             `;
@@ -342,7 +481,7 @@
 
         // Страница профиля
         async function renderProfile() {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             if (!token) {
                 navigateTo('login');
                 return;
@@ -381,7 +520,200 @@
             }
         }
 
-        // Инициализация приложения
+        // Каталог услуг
+        async function renderCatalog() {
+            const token = getToken();
+            const user = getUser();
+            const isAdmin = user && user.role === 'admin';
+
+            document.getElementById('app').innerHTML = `
+                <div class="nav-buttons">
+                    <button class="nav-btn" onclick="navigateTo('home')">← На главную</button>
+                    ${isAdmin ? '<button class="nav-btn" onclick="navigateTo(\'serviceCreate\')">+ Добавить услугу</button>' : ''}
+                </div>
+                <h2>Наши услуги</h2>
+                <div id="servicesList" class="services-grid">Загрузка...</div>
+            `;
+
+            try {
+                const response = await fetch(`${API_URL}/services`);
+                const services = await response.json();
+
+                if (!response.ok) {
+                    document.getElementById('servicesList').innerHTML = `<p>Ошибка загрузки услуг</p>`;
+                    return;
+                }
+
+                if (services.length === 0) {
+                    document.getElementById('servicesList').innerHTML = `<p>Услуг пока нет</p>`;
+                    return;
+                }
+
+                let html = '';
+                for (const service of services) {
+                    html += `
+                        <div class="service-card">
+                            <span class="category">${service.category || 'Услуга'}</span>
+                            <h3>${escapeHtml(service.title)}</h3>
+                            <p>${escapeHtml(service.description || 'Описание отсутствует')}</p>
+                            <div class="price">${service.price} ₽</div>
+                            ${service.isPopular ? '<span style="color: gold;">★ Популярная</span>' : ''}
+                            ${isAdmin ? `
+                                <div class="service-actions">
+                                    <button class="edit-btn" onclick="navigateTo('serviceEdit', ${service.id})">Редактировать</button>
+                                    <button class="delete-btn" onclick="deleteService(${service.id})">Удалить</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                document.getElementById('servicesList').innerHTML = html;
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('servicesList').innerHTML = `<p>Ошибка загрузки услуг</p>`;
+            }
+        }
+
+        // Форма создания/редактирования услуги
+        async function renderServiceForm(id = null) {
+            const token = getToken();
+            if (!token) {
+                navigateTo('login');
+                return;
+            }
+
+            const isEdit = !!id;
+            let service = { title: '', description: '', price: '', category: '', imageUrl: '', isPopular: false };
+
+            if (isEdit) {
+                try {
+                    const response = await fetch(`${API_URL}/services/${id}`);
+                    if (response.ok) {
+                        service = await response.json();
+                    } else {
+                        navigateTo('catalog');
+                        return;
+                    }
+                } catch (error) {
+                    navigateTo('catalog');
+                    return;
+                }
+            }
+
+            document.getElementById('app').innerHTML = `
+                <div class="service-form">
+                    <h2>${isEdit ? 'Редактировать услугу' : 'Добавить услугу'}</h2>
+                    <form id="serviceForm">
+                        <div class="form-group">
+                            <label for="title">Название *</label>
+                            <input type="text" id="title" value="${escapeHtml(service.title)}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Описание</label>
+                            <textarea id="description">${escapeHtml(service.description || '')}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="price">Цена *</label>
+                            <input type="number" id="price" value="${service.price}" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="category">Категория</label>
+                            <input type="text" id="category" value="${escapeHtml(service.category || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label for="imageUrl">URL изображения</label>
+                            <input type="text" id="imageUrl" value="${escapeHtml(service.imageUrl || '')}">
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="isPopular" ${service.isPopular ? 'checked' : ''}>
+                            <label for="isPopular">Популярная услуга</label>
+                        </div>
+                        <button type="submit">${isEdit ? 'Сохранить' : 'Создать'}</button>
+                        <div id="message"></div>
+                    </form>
+                    <button class="nav-btn" onclick="navigateTo('catalog')" style="margin-top: 10px;">Отмена</button>
+                </div>
+            `;
+
+            document.getElementById('serviceForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const title = document.getElementById('title').value;
+                const description = document.getElementById('description').value;
+                const price = parseFloat(document.getElementById('price').value);
+                const category = document.getElementById('category').value;
+                const imageUrl = document.getElementById('imageUrl').value;
+                const isPopular = document.getElementById('isPopular').checked;
+                const messageDiv = document.getElementById('message');
+
+                if (!title || !price) {
+                    messageDiv.innerHTML = '<div class="message error">Заполните название и цену</div>';
+                    return;
+                }
+
+                const method = isEdit ? 'PUT' : 'POST';
+                const url = isEdit ? `${API_URL}/services/${id}` : `${API_URL}/services`;
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ title, description, price, category, imageUrl, isPopular })
+                    });
+
+                    if (response.ok) {
+                        messageDiv.innerHTML = '<div class="message success">Услуга сохранена!</div>';
+                        setTimeout(() => navigateTo('catalog'), 1000);
+                    } else {
+                        const data = await response.json();
+                        messageDiv.innerHTML = `<div class="message error">${data.message || 'Ошибка'}</div>`;
+                    }
+                } catch (error) {
+                    messageDiv.innerHTML = '<div class="message error">Ошибка соединения</div>';
+                }
+            });
+        }
+
+        // Удаление услуги
+        async function deleteService(id) {
+            if (!confirm('Удалить эту услугу?')) return;
+
+            const token = getToken();
+            if (!token) {
+                navigateTo('login');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/services/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    renderCatalog();
+                } else {
+                    alert('Ошибка удаления');
+                }
+            } catch (error) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        // Экранирование HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Инициализация
         updateNavigation();
         navigateTo('home');
     </script>

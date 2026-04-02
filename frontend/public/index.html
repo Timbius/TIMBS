@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barber Shop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        /* Шапка */
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+
+        .nav a:hover {
+            text-decoration: underline;
+        }
+
+        /* Контейнер для контента */
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        /* Формы */
+        .form-card {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 30px;
+            background: #f4f4f4;
+            border-radius: 8px;
+        }
+
+        .form-card h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            background: #333;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #555;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: red;
+        }
+
+        .success {
+            background: #e0ffe0;
+            color: green;
+        }
+
+        /* Профиль */
+        .profile-info {
+            background: #f4f4f4;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            width: auto;
+            padding: 10px 20px;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+        }
+
+        /* Главная */
+        .hero {
+            text-align: center;
+            padding: 60px 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #333;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 0 10px;
+        }
+
+        .btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Barber Factory</div>
+        <div class="nav">
+            <a href="#" onclick="navigateTo('home')">Главная</a>
+            <a href="#" onclick="navigateTo('profile')" id="profileLink" style="display: none;">Профиль</a>
+            <a href="#" onclick="navigateTo('login')" id="loginLink">Вход</a>
+            <a href="#" onclick="logout()" id="logoutLink" style="display: none;">Выйти</a>
+        </div>
+    </div>
+
+    <div class="container" id="app">
+        <!-- Сюда будет загружаться контент -->
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        // Проверка авторизации
+        function isAuthenticated() {
+            return !!localStorage.getItem('token');
+        }
+
+        // Обновление навигации в зависимости от авторизации
+        function updateNavigation() {
+            const isAuth = isAuthenticated();
+            document.getElementById('profileLink').style.display = isAuth ? 'inline' : 'none';
+            document.getElementById('loginLink').style.display = isAuth ? 'none' : 'inline';
+            document.getElementById('logoutLink').style.display = isAuth ? 'inline' : 'none';
+        }
+
+        // Выход
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            updateNavigation();
+            navigateTo('home');
+        }
+
+        // Навигация между страницами
+        function navigateTo(page) {
+            if (page === 'home') {
+                renderHome();
+            } else if (page === 'login') {
+                renderLogin();
+            } else if (page === 'register') {
+                renderRegister();
+            } else if (page === 'profile') {
+                if (isAuthenticated()) {
+                    renderProfile();
+                } else {
+                    renderLogin();
+                }
+            }
+        }
+
+        // Главная страница
+        function renderHome() {
+            document.getElementById('app').innerHTML = `
+                <div class="hero">
+                    <h1>Добро пожаловать в Barber Factory</h1>
+                    <p>Стильные стрижки, бритьё и уход за собой. Запишитесь онлайн!</p>
+                    <a href="#" class="btn" onclick="navigateTo('register')">Зарегистрироваться</a>
+                    <a href="#" class="btn" onclick="navigateTo('login')">Войти</a>
+                </div>
+            `;
+        }
+
+        // Страница входа
+        function renderLogin() {
+            document.getElementById('app').innerHTML = `
+                <div class="form-card">
+                    <h2>Вход</h2>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="email">Email:</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Пароль:</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit">Войти</button>
+                        <div id="message"></div>
+                    </form>
+                    <p style="text-align: center; margin-top: 15px;">
+                        Нет аккаунта? <a href="#" onclick="navigateTo('register')">Зарегистрируйтесь</a>
+                    </p>
+                </div>
+            `;
+
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const messageDiv = document.getElementById('message');
+
+                try {
+                    const response = await fetch(`${API_URL}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        messageDiv.innerHTML = '<div class="message success">Вход выполнен!</div>';
+                        updateNavigation();
+                        setTimeout(() => navigateTo('profile'), 1000);
+                    } else {
+                        messageDiv.innerHTML = `<div class="message error">${data.message || 'Ошибка входа'}</div>`;
+                    }
+                } catch (error) {
+                    messageDiv.innerHTML = '<div class="message error">Ошибка соединения с сервером</div>';
+                }
+            });
+        }
+
+        // Страница регистрации
+        function renderRegister() {
+            document.getElementById('app').innerHTML = `
+                <div class="form-card">
+                    <h2>Регистрация</h2>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="name">Имя:</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email:</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Пароль:</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit">Зарегистрироваться</button>
+                        <div id="message"></div>
+                    </form>
+                    <p style="text-align: center; margin-top: 15px;">
+                        Уже есть аккаунт? <a href="#" onclick="navigateTo('login')">Войдите</a>
+                    </p>
+                </div>
+            `;
+
+            document.getElementById('registerForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const messageDiv = document.getElementById('message');
+
+                try {
+                    const response = await fetch(`${API_URL}/auth/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        messageDiv.innerHTML = '<div class="message success">Регистрация успешна!</div>';
+                        updateNavigation();
+                        setTimeout(() => navigateTo('profile'), 1000);
+                    } else {
+                        messageDiv.innerHTML = `<div class="message error">${data.message || 'Ошибка регистрации'}</div>`;
+                    }
+                } catch (error) {
+                    messageDiv.innerHTML = '<div class="message error">Ошибка соединения с сервером</div>';
+                }
+            });
+        }
+
+        // Страница профиля
+        async function renderProfile() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigateTo('login');
+                return;
+            }
+
+            document.getElementById('app').innerHTML = `
+                <div class="profile-info">
+                    <h3>Информация о пользователе</h3>
+                    <p><strong>Имя:</strong> <span id="userName">Загрузка...</span></p>
+                    <p><strong>Email:</strong> <span id="userEmail">Загрузка...</span></p>
+                    <p><strong>Роль:</strong> <span id="userRole">Загрузка...</span></p>
+                </div>
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            `;
+
+            try {
+                const response = await fetch(`${API_URL}/auth/me`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('userName').textContent = user.name;
+                    document.getElementById('userEmail').textContent = user.email;
+                    document.getElementById('userRole').textContent = user.role;
+                } else {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    updateNavigation();
+                    navigateTo('login');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                navigateTo('login');
+            }
+        }
+
+        // Инициализация приложения
+        updateNavigation();
+        navigateTo('home');
+    </script>
+</body>
+</html>

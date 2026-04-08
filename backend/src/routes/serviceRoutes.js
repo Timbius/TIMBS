@@ -1,5 +1,6 @@
 const express = require('express');
 const authMiddleware = require('../middleware/auth');
+const adminMiddleware = require('../middleware/admin');
 const {
   getAllServices,
   getServiceById,
@@ -14,9 +15,9 @@ const router = express.Router();
 router.get('/', getAllServices);
 router.get('/:id', getServiceById);
 
-// Защищенные маршруты (требуют авторизации)
-router.post('/', authMiddleware, createService);
-router.put('/:id', authMiddleware, updateService);
-router.delete('/:id', authMiddleware, deleteService);
+// Защищенные маршруты (требуют авторизации администратора)
+router.post('/', authMiddleware, adminMiddleware, createService);
+router.put('/:id', authMiddleware, adminMiddleware, updateService);
+router.delete('/:id', authMiddleware, adminMiddleware, deleteService);
 
 module.exports = router;

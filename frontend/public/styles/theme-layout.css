@@ -1,0 +1,19 @@
+﻿html {
+  background:
+    radial-gradient(circle at 10% -20%, rgba(70, 88, 110, 0.18), transparent 45%),
+    radial-gradient(circle at 100% 20%, rgba(58, 71, 90, 0.12), transparent 40%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+}
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); background: rgba(16, 22, 30, 0.7); border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.topbar-inner, .page, .site-footer { width: min(var(--max), calc(100% - 36px)); margin: 0 auto; }
+.topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+.page { flex: 1; padding: 30px 0 56px; }
+.site-footer { margin: 0 auto 24px; padding: 18px 22px; border-radius: 18px; border: 1px solid var(--line); background: rgba(249, 251, 254, 0.75); color: var(--muted); display: grid; gap: 8px; }
+.services { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+.toolbar { display: grid; grid-template-columns: 1.3fr 0.8fr 0.8fr; gap: 12px; margin-bottom: 18px; }
+.section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.profile-grid { display: grid; gap: 12px; }
+.btn-row, .service-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+@keyframes riseIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.reveal { animation: riseIn 0.38s ease both; }

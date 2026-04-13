@@ -371,8 +371,7 @@ function renderRegisterRoute() {
 
 async function renderProfile() {
   if (!isAuth()) {
-    openAuthModal("login");
-    toUrl("/");
+    toUrl("/auth/login");
     return;
   }
 
@@ -428,9 +427,59 @@ async function renderCatalog() {
 
       <div class="summary catalog-summary">
         <span id="catalogSummary">Загрузка каталога...</span>
-        ${isAdmin() ? `<span class="pill">Администратор</span>` : `<span class="pill">Клиент</span>`}
+        <div class="catalog-summary-actions">
+          ${isAdmin() ? `<button class="btn secondary" type="button" id="toggleCreateServiceBtn">Добавить услугу</button>` : ""}
+          ${isAdmin() ? `<span class="pill">Администратор</span>` : `<span class="pill">Клиент</span>`}
+        </div>
       </div>
     </section>
+
+    ${
+      isAdmin()
+        ? `
+      <section class="catalog-admin-wrap">
+        <section class="card panel reveal catalog-admin-panel" id="catalogAdminPanel" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">Панель администратора</span>
+              <h2>Новая услуга</h2>
+            </div>
+          </div>
+
+          <form class="form" id="serviceCreateForm">
+            <div class="toolbar catalog-admin-form-grid">
+              <input class="field" id="serviceTitle" type="text" placeholder="Название услуги" required />
+              <input class="field" id="servicePrice" type="number" min="0" step="0.01" placeholder="Цена" required />
+              <input class="field" id="serviceCategory" type="text" placeholder="Категория" />
+            </div>
+
+            <div class="form-group">
+              <label for="serviceDescription">Описание</label>
+              <textarea class="area" id="serviceDescription" placeholder="Краткое описание услуги"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="serviceImageUrl">Ссылка на изображение (необязательно)</label>
+              <input class="field" id="serviceImageUrl" type="url" placeholder="https://..." />
+            </div>
+
+            <div class="form-group">
+              <label for="servicePopular">
+                <input id="servicePopular" type="checkbox" />
+                Популярная услуга
+              </label>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn primary" type="submit">Сохранить услугу</button>
+            </div>
+            <div id="serviceCreateMessage" aria-live="polite"></div>
+          </form>
+        </section>
+      </section>
+    `
+        : ""
+    }
 
     <section class="catalog-list-wrap">
       <div id="servicesList" class="services services-vertical"></div>
@@ -440,6 +489,9 @@ async function renderCatalog() {
   const searchInput = document.getElementById("searchInput");
   const categorySelect = document.getElementById("categorySelect");
   const sortSelect = document.getElementById("sortSelect");
+  const toggleCreateServiceBtn = document.getElementById("toggleCreateServiceBtn");
+  const catalogAdminPanel = document.getElementById("catalogAdminPanel");
+  const serviceCreateForm = document.getElementById("serviceCreateForm");
 
   searchInput.value = state.filters.search;
   sortSelect.value = state.filters.sort;
@@ -497,6 +549,50 @@ async function renderCatalog() {
     state.filters.sort = sortSelect.value;
     await loadCatalog();
   });
+
+  if (isAdmin() && toggleCreateServiceBtn && catalogAdminPanel && serviceCreateForm) {
+    toggleCreateServiceBtn.addEventListener("click", () => {
+      const willOpen = catalogAdminPanel.hidden;
+      catalogAdminPanel.hidden = !willOpen;
+      toggleCreateServiceBtn.textContent = willOpen ? "Скрыть форму" : "Добавить услугу";
+    });
+
+    serviceCreateForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const out = document.getElementById("serviceCreateMessage");
+
+      try {
+        const payload = {
+          title: document.getElementById("serviceTitle").value.trim(),
+          price: Number(document.getElementById("servicePrice").value),
+          category: document.getElementById("serviceCategory").value.trim() || null,
+          description: document.getElementById("serviceDescription").value.trim() || null,
+          imageUrl: document.getElementById("serviceImageUrl").value.trim() || null,
+          isPopular: document.getElementById("servicePopular").checked,
+        };
+
+        const res = await fetch(`${API_URL}/services`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setMessage(out, "error", data.message || "Не удалось добавить услугу");
+          return;
+        }
+
+        setMessage(out, "success", "Услуга добавлена");
+        serviceCreateForm.reset();
+        await loadCatalog();
+      } catch {
+        setMessage(out, "error", "Не удалось связаться с сервером");
+      }
+    });
+  }
 
   await loadCatalog();
 }

@@ -1,0 +1,13 @@
+{
+  "name": "timbs",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:api": "npm --prefix backend run start",
+    "dev:web": "serve frontend/public -s -l 3000"
+  },
+  "devDependencies": {
+    "serve": "^14.2.5"
+  }
+}

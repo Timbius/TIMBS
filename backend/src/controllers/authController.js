@@ -16,8 +16,19 @@ const register = async (req, res) => {
   }
 
   const { name, email, password } = req.body;
+  const passwordConfirm = req.body.passwordConfirm;
 
   try {
+    if (!/[A-Za-zА-Яа-я]/.test(String(password || ''))) {
+      return res.status(400).json({ message: 'Password must contain at least one letter' });
+    }
+    if (String(password || '').length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+    if (passwordConfirm !== password) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
       return res.status(400).json({ message: 'User with this email already exists' });
@@ -97,4 +108,12 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe };
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: 'Email is required' });
+  return res.json({
+    message: 'Если пользователь с таким email существует, инструкция по восстановлению отправлена.'
+  });
+};
+
+module.exports = { register, login, getMe, forgotPassword };

@@ -1,5 +1,6 @@
-﻿@media (max-width: 980px) {
+@media (max-width: 980px) {
   .toolbar { grid-template-columns: 1fr; }
+  .catalog-grid-4, .catalog-grid-5 { grid-template-columns: 1fr; }
   .brand-title-xl { font-size: clamp(44px, 14vw, 78px); }
   .hero-description { font-size: 18px; }
   .style-strip { grid-template-columns: 1fr; }
@@ -8,7 +9,7 @@
 @media (max-width: 720px) {
   .topbar-inner, .page, .site-footer { width: min(var(--max), calc(100% - 20px)); }
   .panel, .hero-main, .modal-card { padding: 18px; }
-  .nav { gap: 6px; }
+  .nav { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .nav-main { min-width: 94px; }
   .btn, .btn-link { width: 100%; }
   .service-actions { width: 100%; }

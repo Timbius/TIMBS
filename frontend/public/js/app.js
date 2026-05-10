@@ -2,16 +2,14 @@
 
 const state = {
   auth: {
-    token: localStorage.getItem("token") || "",
-    user: (() => {
-      const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    })(),
+    token: "",
+    user: null,
   },
   modal: {
     open: false,
     mode: "login",
     bookingContext: null,
+    authEmail: "",
   },
   catalog: {
     items: [],
@@ -55,16 +53,14 @@ const money = (v) => `${new Intl.NumberFormat("be-BY").format(Number(v) || 0)} B
 const setSession = (data) => {
   state.auth.token = data.token;
   state.auth.user = data.user;
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
 };
 
 const clearSession = () => {
   state.auth.token = "";
   state.auth.user = null;
   state.favorites = new Set();
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("user");
 };
 
 const setMessage = (el, type, text) => {
@@ -88,7 +84,12 @@ async function api(path, options = {}) {
 
   if (isAuth()) headers.Authorization = `Bearer ${state.auth.token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен на http://localhost:5000");
+  }
 
   let data = null;
   try {
@@ -102,7 +103,10 @@ async function api(path, options = {}) {
       (data && data.message) ||
       (data && data.errors && data.errors[0] && data.errors[0].msg) ||
       "Не удалось выполнить запрос";
-    throw new Error(message);
+    const err = new Error(message);
+    err.code = data && data.code;
+    err.payload = data;
+    throw err;
   }
 
   return data;
@@ -119,6 +123,14 @@ function fileToDataUrl(file) {
     reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
     reader.readAsDataURL(file);
   });
+}
+
+function enhanceFileInputs(scope = document) {
+  return scope;
+}
+
+function bindNamedFileHint(inputId, hintId) {
+  return { inputId, hintId };
 }
 
 function ensureModalRoot() {
@@ -154,7 +166,7 @@ async function hydrateAuthUser() {
   try {
     const me = await api("/auth/me");
     state.auth.user = me;
-    localStorage.setItem("user", JSON.stringify(me));
+    sessionStorage.setItem("user", JSON.stringify(me));
     const favoriteIds = await api("/favorites/my/ids");
     state.favorites = new Set(favoriteIds);
   } catch {
@@ -220,8 +232,19 @@ function renderAuthModal() {
     return;
   }
 
-  const isLogin = state.modal.mode === "login";
-  const title = isLogin ? "Вход" : "Регистрация";
+  const mode = state.modal.mode;
+  const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  const isVerify = mode === "verify";
+  const isForgot = mode === "forgot";
+  const isReset = mode === "reset";
+
+  const title =
+    isLogin ? "Вход" :
+    isRegister ? "Регистрация" :
+    isVerify ? "Подтверждение email" :
+    isForgot ? "Восстановление пароля" :
+    "Новый пароль";
 
   root.innerHTML = `
     <div class="modal-backdrop" data-close-modal>
@@ -230,79 +253,133 @@ function renderAuthModal() {
         <div class="modal-head">
           <span class="eyebrow">Barber Factory</span>
           <h2>${title}</h2>
-          <p class="sub">${isLogin ? "Введите почту и пароль." : "Создайте аккаунт для онлайн-записи."}</p>
+          <p class="sub">${
+            isLogin
+              ? "Введите email и пароль."
+              : isRegister
+                ? "Создайте аккаунт для онлайн-записи."
+                : isVerify
+                  ? "Введите 6-символьный код из письма."
+                  : isForgot
+                    ? "Мы отправим код восстановления на вашу почту."
+                    : "Введите код и новый пароль."
+          }</p>
         </div>
 
         <form class="form" id="authModalForm">
           ${
-            isLogin
-              ? ""
-              : `
+            isRegister
+              ? `
             <div class="form-group">
               <label for="modalName">Имя</label>
               <input id="modalName" class="field" type="text" minlength="2" required />
-            </div>`
-          }
-          <div class="form-group">
-            <label for="modalEmail">Email</label>
-            <input id="modalEmail" class="field" type="email" required />
-          </div>
-          <div class="form-group">
-            <label for="modalPassword">Пароль</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input id="modalPassword" class="field" type="password" minlength="6" required />
-              <button
-                type="button"
-                class="btn-link ghost"
-                data-toggle-password="modalPassword"
-                aria-label="Показать пароль"
-                title="Показать пароль"
-                style="min-height:44px; min-width:44px; padding:0 10px;"
-              >рџ‘Ѓ</button>
             </div>
-          </div>
+            <div class="form-group">
+              <label for="modalPhone">Телефон</label>
+              <input id="modalPhone" class="field" type="tel" value="+375" pattern="^\+375\d{9}$" required />
+            </div>`
+              : ""
+          }
+
           ${
-            isLogin
+            isVerify || isForgot || isReset
               ? ""
               : `
+            <div class="form-group">
+              <label for="modalEmail">Email</label>
+              <input id="modalEmail" class="field" type="email" required />
+            </div>`
+          }
+
+          ${
+            isVerify || isReset || isForgot
+              ? `
+            <div class="form-group">
+              <label for="modalFlowEmail">Email</label>
+              <input id="modalFlowEmail" class="field" type="email" value="${esc(state.modal.authEmail || "")}" ${isForgot ? "" : "readonly"} required />
+            </div>`
+              : ""
+          }
+
+          ${
+            isVerify || isReset
+              ? `
+            <div class="form-group">
+              <label for="modalCode">Код</label>
+              <input id="modalCode" class="field" type="text" minlength="6" maxlength="6" required />
+            </div>`
+              : ""
+          }
+          ${
+            isVerify
+              ? `
+            <div class="form-group" style="margin-top:-4px;">
+              <button type="button" class="text-btn" data-resend-verify>Отправить код повторно</button>
+            </div>`
+              : ""
+          }
+
+          ${
+            isLogin || isRegister || isReset
+              ? `
+            <div class="form-group">
+              <label for="modalPassword">Пароль</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input id="modalPassword" class="field" type="password" minlength="6" required />
+                <button type="button" class="btn-link ghost" data-toggle-password="modalPassword" aria-label="Показать пароль" title="Показать пароль" style="min-height:44px; min-width:44px; padding:0 10px;">👁</button>
+              </div>
+              ${
+                isLogin
+                  ? `<div style="margin-top:8px;"><button type="button" class="text-btn" data-switch-auth="forgot">Забыли пароль?</button></div>`
+                  : ""
+              }
+            </div>`
+              : ""
+          }
+
+          ${
+            isRegister || isReset
+              ? `
             <div class="form-group">
               <label for="modalPasswordConfirm">Повторите пароль</label>
               <div style="display:flex; gap:8px; align-items:center;">
                 <input id="modalPasswordConfirm" class="field" type="password" minlength="6" required />
-                <button
-                  type="button"
-                  class="btn-link ghost"
-                  data-toggle-password="modalPasswordConfirm"
-                  aria-label="Показать пароль"
-                  title="Показать пароль"
-                  style="min-height:44px; min-width:44px; padding:0 10px;"
-                >рџ‘Ѓ</button>
+                <button type="button" class="btn-link ghost" data-toggle-password="modalPasswordConfirm" aria-label="Показать пароль" title="Показать пароль" style="min-height:44px; min-width:44px; padding:0 10px;">👁</button>
               </div>
             </div>`
+              : ""
           }
-          <button class="btn primary" type="submit">${isLogin ? "Войти" : "Зарегистрироваться"}</button>
+
+          <button class="btn primary" type="submit">${
+            isLogin ? "Войти" :
+            isRegister ? "Зарегистрироваться" :
+            isVerify ? "Подтвердить" :
+            isForgot ? "Отправить код" :
+            "Сменить пароль"
+          }</button>
           <div id="authModalMessage" aria-live="polite"></div>
         </form>
 
-        <p class="auth-switch">
-          ${
-            isLogin
-              ? `Нет аккаунта? <button type="button" class="text-btn" data-switch-auth="register">Зарегистрироваться</button>`
-              : `Уже есть аккаунт? <button type="button" class="text-btn" data-switch-auth="login">Войти</button>`
-          }
-        </p>
+        <p class="auth-switch">${
+          isLogin
+            ? `Нет аккаунта? <button type="button" class="text-btn" data-switch-auth="register">Регистрация</button>`
+            : isRegister
+              ? `Уже есть аккаунт? <button type="button" class="text-btn" data-switch-auth="login">Войти</button>`
+              : isVerify
+                ? `Неверный email? <button type="button" class="text-btn" data-switch-auth="register">Назад</button>`
+                : isForgot
+                  ? `Вспомнили пароль? <button type="button" class="text-btn" data-switch-auth="login">Войти</button>`
+                  : `Вернуться ко входу <button type="button" class="text-btn" data-switch-auth="login">Войти</button>`
+        }</p>
       </div>
     </div>
   `;
 
   root.querySelectorAll("[data-close-modal]").forEach((el) => el.addEventListener("click", closeAuthModal));
-  root.querySelectorAll("[data-switch-auth]").forEach((el) =>
-    el.addEventListener("click", () => switchAuthMode(el.dataset.switchAuth))
-  );
+  root.querySelectorAll("[data-switch-auth]").forEach((el) => el.addEventListener("click", () => switchAuthMode(el.dataset.switchAuth)));
   root.querySelectorAll("[data-toggle-password]").forEach((button) => {
     button.addEventListener("click", () => {
-      const targetId = button.dataset.togglePassword;
-      const input = document.getElementById(targetId);
+      const input = document.getElementById(button.dataset.togglePassword);
       if (!input) return;
       const show = input.type === "password";
       input.type = show ? "text" : "password";
@@ -310,58 +387,109 @@ function renderAuthModal() {
       button.setAttribute("title", show ? "Скрыть пароль" : "Показать пароль");
     });
   });
+  root.querySelectorAll("[data-resend-verify]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const out = document.getElementById("authModalMessage");
+      try {
+        const emailInput = document.getElementById("modalFlowEmail");
+        const email = (emailInput && emailInput.value.trim()) || state.modal.authEmail || "";
+        if (!email) {
+          setMessage(out, "error", "Укажите email для повторной отправки кода");
+          return;
+        }
+        await api("/auth/resend-verification-code", {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        });
+        setMessage(out, "success", "Код подтверждения отправлен повторно");
+      } catch (error) {
+        setMessage(out, "error", error.message || "Не удалось отправить код");
+      }
+    });
+  });
 
   document.getElementById("authModalForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const out = document.getElementById("authModalMessage");
     try {
-      const email = document.getElementById("modalEmail").value.trim();
-      const password = document.getElementById("modalPassword").value;
-      const name = isLogin ? null : document.getElementById("modalName").value.trim();
+      if (isLogin) {
+        const email = document.getElementById("modalEmail").value.trim();
+        const password = document.getElementById("modalPassword").value;
+        const data = await api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+        setSession(data);
+        await hydrateAuthUser();
+        setMessage(out, "success", "Вход выполнен");
+        setTimeout(afterAuthSuccess, 300);
+        return;
+      }
 
-      if (!email.includes("@")) {
-        setMessage(out, "error", "Проверьте email");
-        return;
-      }
-      if (password.length < 6) {
-        setMessage(out, "error", "Минимум 6 символов в пароле");
-        return;
-      }
-      if (!/\p{L}/u.test(password)) {
-        setMessage(out, "error", "Пароль должен содержать хотя бы одну букву");
-        return;
-      }
-      if (!isLogin) {
-        const confirm = document.getElementById("modalPasswordConfirm").value;
-        if (confirm !== password) {
-          setMessage(out, "error", "Пароли не совпадают");
+      if (isRegister) {
+        const name = document.getElementById("modalName").value.trim();
+        const phone = document.getElementById("modalPhone").value.trim();
+        const email = document.getElementById("modalEmail").value.trim();
+        const password = document.getElementById("modalPassword").value;
+        const passwordConfirm = document.getElementById("modalPasswordConfirm").value;
+        if (!/^\+375\d{9}$/.test(phone)) {
+          setMessage(out, "error", "Телефон должен быть в формате +375XXXXXXXXX");
           return;
         }
+        await api("/auth/register", { method: "POST", body: JSON.stringify({ name, phone, email, password, passwordConfirm }) });
+        state.modal.authEmail = email;
+        setMessage(out, "success", "Код подтверждения отправлен");
+        setTimeout(() => switchAuthMode("verify"), 300);
+        return;
       }
 
-      const endpoint = isLogin ? "/auth/login" : "/auth/register";
-      const payload = isLogin
-        ? { email, password }
-        : { name, email, password, passwordConfirm: document.getElementById("modalPasswordConfirm").value };
-      const data = await api(endpoint, { method: "POST", body: JSON.stringify(payload) });
-      setSession(data);
-      await hydrateAuthUser();
-      setMessage(out, "success", isLogin ? "Вход выполнен" : "Регистрация выполнена");
-      setTimeout(afterAuthSuccess, 300);
+      if (isVerify) {
+        const email = document.getElementById("modalFlowEmail").value.trim();
+        const code = document.getElementById("modalCode").value.trim().toUpperCase();
+        const data = await api("/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) });
+        setSession(data);
+        await hydrateAuthUser();
+        setMessage(out, "success", "Email подтвержден");
+        setTimeout(afterAuthSuccess, 300);
+        return;
+      }
+
+      if (isForgot) {
+        const email = document.getElementById("modalFlowEmail").value.trim();
+        await api("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+        state.modal.authEmail = email;
+        setMessage(out, "success", "Код восстановления отправлен");
+        setTimeout(() => switchAuthMode("reset"), 300);
+        return;
+      }
+
+      if (isReset) {
+        const email = document.getElementById("modalFlowEmail").value.trim();
+        const code = document.getElementById("modalCode").value.trim().toUpperCase();
+        const password = document.getElementById("modalPassword").value;
+        const passwordConfirm = document.getElementById("modalPasswordConfirm").value;
+        await api("/auth/reset-password", { method: "POST", body: JSON.stringify({ email, code, password, passwordConfirm }) });
+        setMessage(out, "success", "Пароль изменен, войдите снова");
+        setTimeout(() => switchAuthMode("login"), 300);
+      }
     } catch (error) {
+      if (isLogin && error.code === "EMAIL_NOT_VERIFIED") {
+        state.modal.authEmail = (error.payload && error.payload.email) || "";
+        setMessage(out, "error", "Email не подтвержден. Новый код отправлен.");
+        setTimeout(() => switchAuthMode("verify"), 300);
+        return;
+      }
       setMessage(out, "error", error.message);
     }
   });
 }
+
 
 function favoriteButton(item) {
   const isFav = state.favorites.has(Number(item.id));
   return `<button class="btn-link ghost fav-btn" type="button" data-fav-id="${item.id}">${isFav ? "★ В избранном" : "☆ В избранное"}</button>`;
 }
 
-function serviceCard(item, admin = false) {
+function serviceCard(item, admin = false, showDescription = true) {
   const imagePart = item.imageUrl
-    ? `<div class="service-image" style="background-image:url('${esc(item.imageUrl)}')"></div>`
+    ? `<div class="service-image"><img class="service-image-img" src="${esc(item.imageUrl)}" alt="${esc(item.title)}" onerror="this.onerror=null;this.parentElement.classList.add('service-image-empty');this.remove();" /></div>`
     : `<div class="service-image service-image-empty">Нет фото</div>`;
 
   return `
@@ -372,7 +500,7 @@ function serviceCard(item, admin = false) {
         ${item.isPopular ? `<span class="pill">Популярно</span>` : ""}
       </div>
       <h3>${esc(item.title)}</h3>
-      <p class="sub">${esc(item.description || "Профессиональный уход и аккуратный результат.")}</p>
+      ${showDescription ? `<p class="sub">${esc(item.description || "Профессиональный уход и аккуратный результат.")}</p>` : ""}
       <div class="price">${money(item.price)}</div>
       <div class="service-actions">
         <button class="btn primary" type="button" data-enroll-id="${item.id}" data-enroll-title="${esc(item.title)}">Записаться</button>
@@ -408,7 +536,7 @@ function barberShowcaseCard(item) {
         <div class="barber-avatar-ring">
           ${
             item.imageUrl
-              ? `<img class="barber-avatar-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}" />`
+              ? `<img class="barber-avatar-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}" onerror="this.onerror=null;this.src='/assets/barber.jpg';" />`
               : `<div class="barber-avatar-placeholder">${esc((item.name || "M").slice(0, 1).toUpperCase())}</div>`
           }
         </div>
@@ -450,7 +578,15 @@ async function renderHome() {
 
   try {
     const [popularRes, barbersRes] = await Promise.allSettled([api("/services/popular"), api("/barbers?top=true")]);
-    const popularServices = popularRes.status === "fulfilled" ? popularRes.value : [];
+    let popularServices = popularRes.status === "fulfilled" ? popularRes.value : [];
+    if (!Array.isArray(popularServices) || !popularServices.length) {
+      try {
+        const fallback = await api("/services?limit=3&sort=newest");
+        popularServices = Array.isArray(fallback?.items) ? fallback.items : [];
+      } catch {
+        popularServices = [];
+      }
+    }
     const topBarbers = barbersRes.status === "fulfilled" ? barbersRes.value : [];
 
     app.innerHTML = `
@@ -482,7 +618,7 @@ async function renderHome() {
           </div>
           <a href="/barbers" data-link class="btn-link secondary">Все мастера</a>
         </div>
-        <div class="services">${topBarbers.length ? topBarbers.map((item) => barberCard(item)).join("") : `<div class="empty"><h3>Список мастеров временно недоступен</h3></div>`}</div>
+        <div class="barbers-grid">${topBarbers.length ? topBarbers.map((item) => barberShowcaseCard(item)).join("") : `<div class="empty"><h3>Список мастеров временно недоступен</h3></div>`}</div>
       </section>
     `;
 
@@ -562,34 +698,41 @@ async function renderCatalog() {
         <h1 class="catalog-logo">BARBER FACTORY</h1>
         <p class="sub catalog-sub">Каталог услуг</p>
 
-        <form id="catalogFilterForm" class="toolbar catalog-toolbar catalog-grid-5">
-          <input class="field" id="searchInput" type="search" placeholder="Поиск услуги" value="${esc(state.catalog.filters.search)}" />
-          <select class="select" id="categorySelect">
-            <option value="">Все категории</option>
-            ${categoryOptions}
-          </select>
-          <input class="field" id="minPriceInput" type="number" min="0" placeholder="Цена от" value="${esc(state.catalog.filters.minPrice)}" />
-          <input class="field" id="maxPriceInput" type="number" min="0" placeholder="Цена до" value="${esc(state.catalog.filters.maxPrice)}" />
-          <select class="select" id="sortSelect">
-            <option value="newest">Сначала новые</option>
-            <option value="price_asc">Сначала дешевле</option>
-            <option value="price_desc">Сначала дороже</option>
-            <option value="title_asc">По названию А-Я</option>
-          </select>
-          <button class="btn secondary" type="submit">Найти</button>
+        <form id="catalogFilterForm" class="catalog-filter-layout">
+          <div class="catalog-filter-inline">
+            <select class="select" id="categorySelect">
+              <option value="">Все категории</option>
+              ${categoryOptions}
+            </select>
+            <select class="select" id="sortSelect">
+              <option value="newest">Сначала новые</option>
+              <option value="price_asc">Сначала дешевле</option>
+              <option value="price_desc">Сначала дороже</option>
+              <option value="title_asc">По названию А-Я</option>
+            </select>
+          </div>
+
+          <div class="catalog-filter-prices">
+            <input class="field" id="minPriceInput" type="number" min="0" placeholder="Цена от" value="${esc(state.catalog.filters.minPrice)}" />
+            <input class="field" id="maxPriceInput" type="number" min="0" placeholder="Цена до" value="${esc(state.catalog.filters.maxPrice)}" />
+          </div>
+
+          <div class="catalog-filter-center">
+            <input class="field" id="searchInput" type="search" placeholder="Поиск услуги" value="${esc(state.catalog.filters.search)}" />
+          </div>
+
+          <div class="catalog-filter-submit">
+            <button class="btn secondary" type="submit">Найти</button>
+          </div>
         </form>
 
         <div class="summary catalog-summary">
           <span id="catalogSummary">Найдено услуг: ${state.catalog.items.length} из ${state.catalog.total}</span>
-          <div class="catalog-summary-actions">
-            ${isAdmin() ? `<a href="/admin" data-link class="btn-link secondary">Панель администратора</a>` : ""}
-            ${isAuth() ? `<a href="/records" data-link class="btn-link secondary">Мои записи</a>` : ""}
-          </div>
         </div>
       </section>
 
       <section class="catalog-list-wrap">
-        <div id="servicesList" class="services services-vertical">${state.catalog.items.map((item) => serviceCard(item, isAdmin())).join("")}</div>
+        <div id="servicesList" class="services services-grid">${state.catalog.items.map((item) => serviceCard(item, isAdmin(), false)).join("")}</div>
         <div class="btn-row center-row">
           <button class="btn secondary" id="loadMoreBtn" ${state.catalog.items.length >= state.catalog.total ? "disabled" : ""}>Загрузить еще</button>
         </div>
@@ -614,7 +757,7 @@ async function renderCatalog() {
         state.catalog.page += 1;
         const next = await loadCatalog({ reset: false });
         document.getElementById("servicesList").innerHTML = state.catalog.items
-          .map((item) => serviceCard(item, isAdmin()))
+          .map((item) => serviceCard(item, isAdmin(), false))
           .join("");
         document.getElementById("catalogSummary").textContent = `Найдено услуг: ${state.catalog.items.length} из ${state.catalog.total}`;
         const btn = document.getElementById("loadMoreBtn");
@@ -656,7 +799,7 @@ async function renderService(id) {
   try {
     const item = await api(`/services/${id}`);
     const imageBlock = item.imageUrl
-      ? `<img class="service-detail-image" src="${esc(item.imageUrl)}" alt="${esc(item.title)}" />`
+      ? `<img class="service-detail-image" src="${esc(item.imageUrl)}" alt="${esc(item.title)}" onerror="this.onerror=null;this.src='/assets/hero-bg.jpg';" />`
       : `<div class="service-detail-image service-detail-image-empty">${esc((item.title || "У").slice(0, 1).toUpperCase())}</div>`;
 
     app.innerHTML = `
@@ -699,7 +842,7 @@ async function renderBarbers() {
     app.innerHTML = `
       <section class="catalog-topbar reveal">
         <h1 class="catalog-logo">Наши мастера</h1>
-        <form id="barbersSearchForm" class="toolbar catalog-toolbar">
+        <form id="barbersSearchForm" class="toolbar catalog-toolbar barbers-search-form">
           <input class="field" id="barbersSearchInput" type="search" placeholder="Поиск по имени или специализации" value="${esc(search)}" />
           <button class="btn secondary" type="submit">Найти</button>
         </form>
@@ -729,7 +872,7 @@ async function renderBarberDetail(id) {
     ]);
 
     const imageBlock = barber.imageUrl
-      ? `<img class="barber-detail-image" src="${esc(barber.imageUrl)}" alt="${esc(barber.name)}" />`
+      ? `<img class="barber-detail-image" src="${esc(barber.imageUrl)}" alt="${esc(barber.name)}" onerror="this.onerror=null;this.src='/assets/barber.jpg';" />`
       : `<div class="barber-detail-image barber-detail-image-empty">${esc((barber.name || "M").slice(0, 1).toUpperCase())}</div>`;
 
     app.innerHTML = `
@@ -818,7 +961,7 @@ async function renderProfile() {
   try {
     const [me, myRecords, myFavorites, myReviews] = await Promise.all([
       api("/users/me"),
-      api("/records/my"),
+      api("/users/me/records"),
       api("/favorites/my"),
       api("/reviews/my")
     ]);
@@ -831,17 +974,38 @@ async function renderProfile() {
         <div class="profile-avatar-wrap">
           <img class="profile-avatar" id="profileAvatarPreview" src="${esc(
             me.avatarUrl || "https://placehold.co/160x160?text=Avatar"
-          )}" alt="Аватар пользователя" />
+          )}" alt="Аватар пользователя" onerror="this.onerror=null;this.src='https://placehold.co/160x160?text=Avatar';" />
         </div>
         <form class="form" id="profileForm">
           <div class="toolbar catalog-toolbar">
             <input class="field" id="profileName" type="text" minlength="2" required value="${esc(me.name)}" />
             <input class="field" id="profileEmail" type="email" required value="${esc(me.email)}" />
+            <input class="field" id="profilePhone" type="tel" required value="${esc(me.phone || "+375")}" pattern="^\\+375\\d{9}$" />
             <button class="btn primary" type="submit">Сохранить профиль</button>
           </div>
           <div class="form-group">
-            <label for="profileAvatarFile">Фото профиля (JPG/PNG, до 2MB)</label>
-            <input class="field" id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" />
+            <label>Аватар профиля</label>
+            <button class="btn secondary" type="button" id="toggleAvatarEditBtn">Аватар профиля</button>
+            <div id="profileAvatarEditWrap" hidden>
+              <div class="avatar-edit-actions">
+                <button class="btn-link secondary" type="button" id="avatarChooseFileBtn">Выбрать файл</button>
+                <button class="btn-link secondary" type="button" id="avatarChooseUrlBtn">Вставить ссылку</button>
+              </div>
+              <div id="profileAvatarFileWrap" hidden>
+                <label for="profileAvatarFile">Фото профиля (JPG/PNG, до 2MB)</label>
+                <input class="field" id="profileAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              </div>
+              <div id="profileAvatarUrlWrap" hidden>
+                <label for="profileAvatarUrl">Ссылка на фото (прямая ссылка на изображение)</label>
+                <div class="inline-field-actions">
+                  <input class="field" id="profileAvatarUrl" type="url" placeholder="https://example.com/photo.jpg" />
+                  <button class="btn-link ghost mini-clear-btn" type="button" id="clearProfileAvatarUrlBtn" aria-label="Очистить ссылку">×</button>
+                </div>
+              </div>
+              <div class="avatar-edit-actions">
+                <button class="btn danger image-delete-btn" type="button" id="avatarDeleteBtn">Удалить фото</button>
+              </div>
+            </div>
           </div>
           <div id="profileMessage" aria-live="polite"></div>
         </form>
@@ -887,12 +1051,58 @@ async function renderProfile() {
       </details>
     `;
 
+    const avatarEditBtn = document.getElementById("toggleAvatarEditBtn");
+    const avatarEditWrap = document.getElementById("profileAvatarEditWrap");
+    const avatarFileWrap = document.getElementById("profileAvatarFileWrap");
+    const avatarUrlWrap = document.getElementById("profileAvatarUrlWrap");
+    const avatarInput = document.getElementById("profileAvatarFile");
+    const avatarUrlInput = document.getElementById("profileAvatarUrl");
+    const avatarChooseFileBtn = document.getElementById("avatarChooseFileBtn");
+    const avatarChooseUrlBtn = document.getElementById("avatarChooseUrlBtn");
+    const avatarDeleteBtn = document.getElementById("avatarDeleteBtn");
+    const clearProfileAvatarUrlBtn = document.getElementById("clearProfileAvatarUrlBtn");
+    let removeAvatar = false;
+    enhanceFileInputs(document.getElementById("profileForm"));
+
+    if (avatarEditBtn && avatarEditWrap) {
+      avatarEditBtn.addEventListener("click", () => {
+        avatarEditWrap.hidden = !avatarEditWrap.hidden;
+      });
+    }
+    if (avatarChooseFileBtn && avatarFileWrap && avatarUrlWrap) {
+      avatarChooseFileBtn.addEventListener("click", () => {
+        avatarFileWrap.hidden = false;
+        avatarUrlWrap.hidden = true;
+        removeAvatar = false;
+      });
+    }
+    if (avatarChooseUrlBtn && avatarFileWrap && avatarUrlWrap) {
+      avatarChooseUrlBtn.addEventListener("click", () => {
+        avatarUrlWrap.hidden = false;
+        avatarFileWrap.hidden = true;
+        removeAvatar = false;
+      });
+    }
+    if (avatarDeleteBtn) {
+      avatarDeleteBtn.addEventListener("click", () => {
+        removeAvatar = true;
+        if (avatarInput) avatarInput.value = "";
+        if (avatarUrlInput) avatarUrlInput.value = "";
+        document.getElementById("profileAvatarPreview").src = "https://placehold.co/160x160?text=Avatar";
+      });
+    }
+    if (clearProfileAvatarUrlBtn && avatarUrlInput) {
+      clearProfileAvatarUrlBtn.addEventListener("click", () => {
+        avatarUrlInput.value = "";
+      });
+    }
+
     document.getElementById("profileForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       const out = document.getElementById("profileMessage");
       const name = document.getElementById("profileName").value.trim();
       const email = document.getElementById("profileEmail").value.trim();
-      const avatarInput = document.getElementById("profileAvatarFile");
+      const phone = document.getElementById("profilePhone").value.trim();
 
       if (name.length < 2) {
         setMessage(out, "error", "Имя слишком короткое");
@@ -902,24 +1112,30 @@ async function renderProfile() {
         setMessage(out, "error", "Некорректный email");
         return;
       }
+      if (!/^\+375\d{9}$/.test(phone)) {
+        setMessage(out, "error", "Телефон должен быть в формате +375XXXXXXXXX");
+        return;
+      }
 
       try {
-        let avatarUrl = me.avatarUrl || null;
-        const file = avatarInput.files && avatarInput.files[0];
-        if (file) {
+        let avatarUrl = removeAvatar ? null : me.avatarUrl || null;
+        const file = avatarInput && avatarInput.files && avatarInput.files[0];
+        if (!removeAvatar && file) {
           if (file.size > 2 * 1024 * 1024) {
             setMessage(out, "error", "Файл слишком большой. Максимум 2MB");
             return;
           }
           avatarUrl = await fileToDataUrl(file);
+        } else if (!removeAvatar && avatarUrlInput && avatarUrlInput.value.trim()) {
+          avatarUrl = avatarUrlInput.value.trim();
         }
 
         const user = await api("/users/me", {
           method: "PUT",
-          body: JSON.stringify({ name, email, avatarUrl }),
+          body: JSON.stringify({ name, email, phone, avatarUrl }),
         });
         state.auth.user = user;
-        localStorage.setItem("user", JSON.stringify(user));
+        sessionStorage.setItem("user", JSON.stringify(user));
         updateNav();
         document.getElementById("profileAvatarPreview").src =
           user.avatarUrl || "https://placehold.co/160x160?text=Avatar";
@@ -1015,15 +1231,18 @@ async function renderRecords() {
               <option value="">Выберите мастера</option>
               ${barbers.map((b) => `<option value="${b.id}">${esc(b.name)} (${esc(b.specialty || "мастер")})</option>`).join("")}
             </select>
-            <input class="field" id="recordDateTime" type="datetime-local" required min="${toDatetimeLocal(Date.now() + 30 * 60 * 1000)}" />
+            <input class="field" id="recordDate" type="date" required />
             <button class="btn primary" type="submit">Подтвердить</button>
+          </div>
+          <div class="form-group">
+            <label>Выберите свободный слот</label>
+            <div id="recordSlots" class="record-slots-grid"></div>
           </div>
           <div class="form-group">
             <label for="recordComment">Комментарий</label>
             <textarea class="area" id="recordComment" placeholder="Пожелания к записи"></textarea>
           </div>
           <div id="recordMessage" aria-live="polite"></div>
-          <div id="recordSchedule" class="schedule-list"></div>
         </form>
       </section>
 
@@ -1077,45 +1296,108 @@ async function renderRecords() {
       </section>
     `;
 
-    const refreshSchedule = async () => {
+    const selected = { slot: "" };
+    const dateInput = document.getElementById("recordDate");
+    dateInput.value = new Date().toISOString().slice(0, 10);
+
+    const toMin = (hhmm) => {
+      const [h, m] = hhmm.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const toHHMM = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    const allSlots = [];
+    for (let m = 10 * 60; m <= 21 * 60 + 30; m += 15) allSlots.push(toHHMM(m));
+
+    const refreshSlots = async () => {
       const barberId = document.getElementById("recordBarber").value;
-      const dateTime = document.getElementById("recordDateTime").value;
-      const out = document.getElementById("recordSchedule");
-      if (!barberId || !dateTime) {
-        out.innerHTML = "";
+      const date = dateInput.value;
+      const slotsRoot = document.getElementById("recordSlots");
+      selected.slot = "";
+      if (!barberId || !date) {
+        slotsRoot.innerHTML = `<p class="sub">Сначала выберите мастера и дату.</p>`;
         return;
       }
-      const date = dateTime.slice(0, 10);
+
       try {
         const schedule = await api(`/records/schedule?barber=${barberId}&date=${date}`);
-        out.innerHTML = `<p class="sub">Занятые слоты: ${schedule.length ? schedule.map((s) => new Date(s.appointmentAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })).join(", ") : "нет"}</p>`;
+        const now = new Date();
+
+        const busyStart = schedule.map((s) => {
+          const d = new Date(s.appointmentAt);
+          return d.getHours() * 60 + d.getMinutes();
+        });
+
+        const isBusy = (slot) => {
+          const start = toMin(slot);
+          return busyStart.some((b) => Math.abs(start - b) < 30);
+        };
+
+        const isPastToday = (slot) => {
+          const day = new Date(`${date}T00:00:00`);
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          if (day.getTime() !== today.getTime()) return false;
+          const start = toMin(slot);
+          const current = now.getHours() * 60 + now.getMinutes();
+          return start <= current;
+        };
+
+        const freeSlots = allSlots.filter((slot) => !isBusy(slot) && !isPastToday(slot));
+        if (!freeSlots.length) {
+          slotsRoot.innerHTML = `<p class="sub">На выбранную дату у мастера нет свободных окон.</p>`;
+          return;
+        }
+
+        slotsRoot.innerHTML = freeSlots
+          .map(
+            (slot) =>
+              `<button class="btn-link secondary slot-btn" type="button" data-slot="${slot}">${slot}</button>`
+          )
+          .join("");
+
+        slotsRoot.querySelectorAll("[data-slot]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            selected.slot = btn.dataset.slot;
+            slotsRoot.querySelectorAll("[data-slot]").forEach((x) => x.classList.remove("active"));
+            btn.classList.add("active");
+          });
+        });
       } catch {
-        out.innerHTML = `<p class="sub">Не удалось загрузить занятые слоты</p>`;
+        slotsRoot.innerHTML = `<p class="sub">Не удалось загрузить свободные слоты.</p>`;
       }
     };
 
-    document.getElementById("recordBarber").addEventListener("change", refreshSchedule);
-    document.getElementById("recordDateTime").addEventListener("change", refreshSchedule);
+    document.getElementById("recordBarber").addEventListener("change", refreshSlots);
+    dateInput.addEventListener("change", refreshSlots);
+    refreshSlots();
 
     document.getElementById("recordForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       const out = document.getElementById("recordMessage");
       const serviceId = Number(document.getElementById("recordService").value);
       const barberId = Number(document.getElementById("recordBarber").value);
-      const appointmentAt = document.getElementById("recordDateTime").value;
+      const date = dateInput.value;
       const comment = document.getElementById("recordComment").value.trim();
 
       if (!serviceId || !barberId) {
         setMessage(out, "error", "Выберите услугу и мастера");
         return;
       }
-      if (!appointmentAt || Number(new Date(appointmentAt)) <= Date.now()) {
-        setMessage(out, "error", "Выберите будущую дату и время");
+      if (!selected.slot) {
+        setMessage(out, "error", "Выберите свободный слот времени");
+        return;
+      }
+
+      const appointmentAt = `${date}T${selected.slot}:00`;
+      if (Number(new Date(appointmentAt)) <= Date.now()) {
+        setMessage(out, "error", "Нельзя записаться на прошедшее время");
         return;
       }
 
       try {
-        await api("/records", { method: "POST", body: JSON.stringify({ serviceId, barberId, appointmentAt, comment }) });
+        await api("/records", {
+          method: "POST",
+          body: JSON.stringify({ serviceId, barberId, appointmentAt, date: appointmentAt, comment }),
+        });
         setMessage(out, "success", "Запись успешно создана");
         setTimeout(renderRecords, 300);
       } catch (error) {
@@ -1252,24 +1534,24 @@ async function renderAdmin() {
         </div>
       </section>
 
-      <details class="home-preview" open>
+      <details class="home-preview admin-section">
         <summary class="section-head"><h2>Пользователи (${users.length})</h2></summary>
-        <div class="services services-vertical">${users.map((u) => `<article class="service-card"><h3>${esc(u.name)}</h3><p class="sub">${esc(u.email)} · ${esc(u.role)}</p>${u.id !== state.auth.user.id ? `<div class="btn-row"><button class="btn danger" type="button" data-delete-user="${u.id}">Удалить пользователя</button></div>` : ""}</article>`).join("")}</div>
+        <div class="services services-vertical admin-list">${users.map((u) => `<article class="service-card"><h3>${esc(u.name)}</h3><p class="sub">${esc(u.email)} · ${esc(u.role)}</p>${u.id !== state.auth.user.id ? `<div class="btn-row"><button class="btn danger" type="button" data-delete-user="${u.id}">Удалить пользователя</button></div>` : ""}</article>`).join("")}</div>
       </details>
 
-      <details class="home-preview" open>
+      <details class="home-preview admin-section">
         <summary class="section-head"><h2>Записи (${records.length})</h2></summary>
-        <div class="services services-vertical">${records.map((r) => renderRecordBrief(r)).join("")}</div>
+        <div class="services services-vertical admin-list">${records.map((r) => renderRecordBrief(r)).join("")}</div>
       </details>
 
-      <details class="home-preview" open>
+      <details class="home-preview admin-section">
         <summary class="section-head"><h2>Услуги (${services.length})</h2></summary>
-        <div class="services services-vertical">${services.map((s) => renderServiceBrief(s)).join("")}</div>
+        <div class="services services-vertical admin-list">${services.map((s) => renderServiceBrief(s)).join("")}</div>
       </details>
 
-      <details class="home-preview" open>
+      <details class="home-preview admin-section">
         <summary class="section-head"><h2>Мастера (${barbers.length})</h2></summary>
-        <div class="services services-vertical">${barbers.map((b) => renderBarberBrief(b)).join("")}</div>
+        <div class="services services-vertical admin-list">${barbers.map((b) => renderBarberBrief(b)).join("")}</div>
       </details>
       <div id="adminModalHost"></div>
     `;
@@ -1281,7 +1563,7 @@ async function renderAdmin() {
     const openModal = ({ title, body, onSubmit, submitText = "Сохранить" }) => {
       modalHost.innerHTML = `
         <div class="modal-backdrop" data-close-admin-modal>
-          <div class="modal-card" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+          <div class="modal-card modal-card-admin" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
             <button class="modal-close" type="button" data-close-admin-modal aria-label="Закрыть">×</button>
             <div class="modal-head"><h2>${esc(title)}</h2></div>
             <form id="adminModalForm" class="form">
@@ -1296,6 +1578,7 @@ async function renderAdmin() {
       `;
       modalHost.querySelectorAll("[data-close-admin-modal]").forEach((el) => el.addEventListener("click", closeModal));
       document.getElementById("adminModalForm").addEventListener("submit", onSubmit);
+      enhanceFileInputs(document.getElementById("adminModalForm"));
     };
 
     document.getElementById("openCreateBarberModal").addEventListener("click", () => {
@@ -1306,8 +1589,13 @@ async function renderAdmin() {
             <input class="field" id="modalBarberName" type="text" placeholder="Имя мастера" required />
             <input class="field" id="modalBarberSpecialty" type="text" placeholder="Полная специализация" />
             <input class="field" id="modalBarberExperience" type="number" min="0" placeholder="Стаж (лет)" />
-            <input class="field" id="modalBarberImageUrl" type="url" placeholder="Ссылка на фото" />
+            <label for="modalBarberImageUrl">Ссылка на фото (прямая ссылка на изображение)</label>
+            <div class="inline-field-actions">
+              <input class="field" id="modalBarberImageUrl" type="url" placeholder="https://example.com/barber.jpg" />
+              <button class="btn-link ghost mini-clear-btn" type="button" id="clearModalBarberImageUrlBtn" aria-label="Очистить ссылку">×</button>
+            </div>
             <input class="field" id="modalBarberImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+            <button class="btn danger image-delete-btn" type="button" id="modalBarberImageDeleteBtn">Удалить фото</button>
             <textarea class="area" id="modalBarberBio" placeholder="Описание мастера"></textarea>
           </div>
         `,
@@ -1319,11 +1607,12 @@ async function renderAdmin() {
           const experienceYears = Number(document.getElementById("modalBarberExperience").value || 0);
           const imageUrl = document.getElementById("modalBarberImageUrl").value.trim();
           const imageFile = document.getElementById("modalBarberImageFile").files?.[0] || null;
+          const removeImage = document.getElementById("modalBarberImageDeleteBtn")?.dataset.remove === "1";
           const bio = document.getElementById("modalBarberBio").value.trim();
           if (name.length < 2) return setMessage(out, "error", "Имя слишком короткое");
           try {
-            let payloadImage = imageUrl || null;
-            if (imageFile) {
+            let payloadImage = removeImage ? null : imageUrl || null;
+            if (!removeImage && imageFile) {
               if (imageFile.size > 2 * 1024 * 1024) return setMessage(out, "error", "Фото слишком большое (2MB)");
               payloadImage = await fileToDataUrl(imageFile);
             }
@@ -1339,6 +1628,23 @@ async function renderAdmin() {
         },
         submitText: "Добавить"
       });
+      const deleteBtn = document.getElementById("modalBarberImageDeleteBtn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", () => {
+          deleteBtn.dataset.remove = "1";
+          const urlInput = document.getElementById("modalBarberImageUrl");
+          const fileInput = document.getElementById("modalBarberImageFile");
+          if (urlInput) urlInput.value = "";
+          if (fileInput) fileInput.value = "";
+        });
+      }
+      const clearUrlBtn = document.getElementById("clearModalBarberImageUrlBtn");
+      const urlInput = document.getElementById("modalBarberImageUrl");
+      if (clearUrlBtn && urlInput) {
+        clearUrlBtn.addEventListener("click", () => {
+          urlInput.value = "";
+        });
+      }
     });
 
     document.getElementById("openCreateServiceModal").addEventListener("click", () => {
@@ -1350,8 +1656,13 @@ async function renderAdmin() {
             <input class="field" id="modalServicePrice" type="number" min="1" step="0.01" placeholder="Цена BYN" required />
             <input class="field" id="modalServiceCategory" type="text" placeholder="Категория" />
             <input class="field" id="modalServiceDuration" type="number" min="10" step="5" placeholder="Длительность (мин)" />
-            <input class="field" id="modalServiceImageUrl" type="url" placeholder="Ссылка на фото" />
+            <label for="modalServiceImageUrl">Ссылка на фото (прямая ссылка на изображение)</label>
+            <div class="inline-field-actions">
+              <input class="field" id="modalServiceImageUrl" type="url" placeholder="https://example.com/service.jpg" />
+              <button class="btn-link ghost mini-clear-btn" type="button" id="clearModalServiceImageUrlBtn" aria-label="Очистить ссылку">×</button>
+            </div>
             <input class="field" id="modalServiceImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+            <button class="btn danger image-delete-btn" type="button" id="modalServiceImageDeleteBtn">Удалить фото</button>
             <textarea class="area" id="modalServiceDescription" placeholder="Описание услуги"></textarea>
             <div class="form-group">
               <label>Рекомендованные мастера</label>
@@ -1368,12 +1679,13 @@ async function renderAdmin() {
           const durationMin = Number(document.getElementById("modalServiceDuration").value || 60);
           const imageUrl = document.getElementById("modalServiceImageUrl").value.trim();
           const imageFile = document.getElementById("modalServiceImageFile").files?.[0] || null;
+          const removeImage = document.getElementById("modalServiceImageDeleteBtn")?.dataset.remove === "1";
           const description = document.getElementById("modalServiceDescription").value.trim();
           const barberIds = Array.from(document.querySelectorAll("#modalCreateServiceBarbers [data-barber-link]:checked")).map((el) => Number(el.value));
           if (title.length < 2 || !Number.isFinite(price) || price <= 0) return setMessage(out, "error", "Проверьте название и цену");
           try {
-            let payloadImage = imageUrl || null;
-            if (imageFile) {
+            let payloadImage = removeImage ? null : imageUrl || null;
+            if (!removeImage && imageFile) {
               if (imageFile.size > 2 * 1024 * 1024) return setMessage(out, "error", "Фото слишком большое (2MB)");
               payloadImage = await fileToDataUrl(imageFile);
             }
@@ -1398,6 +1710,23 @@ async function renderAdmin() {
         },
         submitText: "Добавить"
       });
+      const deleteBtn = document.getElementById("modalServiceImageDeleteBtn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", () => {
+          deleteBtn.dataset.remove = "1";
+          const urlInput = document.getElementById("modalServiceImageUrl");
+          const fileInput = document.getElementById("modalServiceImageFile");
+          if (urlInput) urlInput.value = "";
+          if (fileInput) fileInput.value = "";
+        });
+      }
+      const clearUrlBtn = document.getElementById("clearModalServiceImageUrlBtn");
+      const urlInput = document.getElementById("modalServiceImageUrl");
+      if (clearUrlBtn && urlInput) {
+        clearUrlBtn.addEventListener("click", () => {
+          urlInput.value = "";
+        });
+      }
     });
 
     document.querySelectorAll("[data-delete-barber]").forEach((btn) => {
@@ -1488,8 +1817,13 @@ async function renderAdmin() {
               <input class="field" id="modalEditBarberName" type="text" value="${esc(barber.name)}" required />
               <input class="field" id="modalEditBarberSpecialty" type="text" value="${esc(barber.specialty || "")}" />
               <input class="field" id="modalEditBarberExperience" type="number" min="0" value="${Number(barber.experienceYears || 0)}" />
-              <input class="field" id="modalEditBarberImageUrl" type="url" value="${esc(barber.imageUrl || "")}" placeholder="Ссылка на фото" />
+              <label for="modalEditBarberImageUrl">Ссылка на фото (прямая ссылка на изображение)</label>
+              <div class="inline-field-actions">
+                <input class="field" id="modalEditBarberImageUrl" type="url" value="" placeholder="https://example.com/barber.jpg" />
+                <button class="btn-link ghost mini-clear-btn" type="button" id="clearModalEditBarberImageUrlBtn" aria-label="Очистить ссылку">×</button>
+              </div>
               <input class="field" id="modalEditBarberImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button class="btn danger image-delete-btn" type="button" id="modalEditBarberImageDeleteBtn">Удалить фото</button>
               <textarea class="area" id="modalEditBarberBio">${esc(barber.bio || "")}</textarea>
             </div>
           `,
@@ -1497,10 +1831,16 @@ async function renderAdmin() {
             event.preventDefault();
             const out = document.getElementById("adminModalMessage");
             const imageFile = document.getElementById("modalEditBarberImageFile").files?.[0] || null;
-            let payloadImage = document.getElementById("modalEditBarberImageUrl").value.trim() || null;
-            if (imageFile) {
+            const removeImage = document.getElementById("modalEditBarberImageDeleteBtn")?.dataset.remove === "1";
+            let payloadImage = barber.imageUrl || null;
+            const urlValue = document.getElementById("modalEditBarberImageUrl").value.trim();
+            if (removeImage) {
+              payloadImage = null;
+            } else if (imageFile) {
               if (imageFile.size > 2 * 1024 * 1024) return setMessage(out, "error", "Фото слишком большое (2MB)");
               payloadImage = await fileToDataUrl(imageFile);
+            } else if (urlValue) {
+              payloadImage = urlValue;
             }
             const payload = {
               name: document.getElementById("modalEditBarberName").value.trim(),
@@ -1519,6 +1859,23 @@ async function renderAdmin() {
             }
           }
         });
+        const deleteBtn = document.getElementById("modalEditBarberImageDeleteBtn");
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", () => {
+            deleteBtn.dataset.remove = "1";
+            const urlInput = document.getElementById("modalEditBarberImageUrl");
+            const fileInput = document.getElementById("modalEditBarberImageFile");
+            if (urlInput) urlInput.value = "";
+            if (fileInput) fileInput.value = "";
+          });
+        }
+        const clearUrlBtn = document.getElementById("clearModalEditBarberImageUrlBtn");
+        const urlInput = document.getElementById("modalEditBarberImageUrl");
+        if (clearUrlBtn && urlInput) {
+          clearUrlBtn.addEventListener("click", () => {
+            urlInput.value = "";
+          });
+        }
       });
     });
 
@@ -1534,8 +1891,13 @@ async function renderAdmin() {
               <input class="field" id="modalEditServicePrice" type="number" min="1" step="0.01" value="${Number(service.price)}" required />
               <input class="field" id="modalEditServiceCategory" type="text" value="${esc(service.category || "")}" />
               <input class="field" id="modalEditServiceDuration" type="number" min="10" step="5" value="${Number(service.durationMin || 60)}" />
-              <input class="field" id="modalEditServiceImageUrl" type="url" value="${esc(service.imageUrl || "")}" />
+              <label for="modalEditServiceImageUrl">Ссылка на фото (прямая ссылка на изображение)</label>
+              <div class="inline-field-actions">
+                <input class="field" id="modalEditServiceImageUrl" type="url" value="" placeholder="https://example.com/service.jpg" />
+                <button class="btn-link ghost mini-clear-btn" type="button" id="clearModalEditServiceImageUrlBtn" aria-label="Очистить ссылку">×</button>
+              </div>
               <input class="field" id="modalEditServiceImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button class="btn danger image-delete-btn" type="button" id="modalEditServiceImageDeleteBtn">Удалить фото</button>
               <textarea class="area" id="modalEditServiceDescription">${esc(service.description || "")}</textarea>
               <div class="form-group">
                 <label>Рекомендованные мастера</label>
@@ -1548,10 +1910,16 @@ async function renderAdmin() {
             const out = document.getElementById("adminModalMessage");
             const barberIds = Array.from(document.querySelectorAll("#modalEditServiceBarbers [data-barber-link]:checked")).map((el) => Number(el.value));
             const imageFile = document.getElementById("modalEditServiceImageFile").files?.[0] || null;
-            let payloadImage = document.getElementById("modalEditServiceImageUrl").value.trim() || null;
-            if (imageFile) {
+            const removeImage = document.getElementById("modalEditServiceImageDeleteBtn")?.dataset.remove === "1";
+            let payloadImage = service.imageUrl || null;
+            const urlValue = document.getElementById("modalEditServiceImageUrl").value.trim();
+            if (removeImage) {
+              payloadImage = null;
+            } else if (imageFile) {
               if (imageFile.size > 2 * 1024 * 1024) return setMessage(out, "error", "Фото слишком большое (2MB)");
               payloadImage = await fileToDataUrl(imageFile);
+            } else if (urlValue) {
+              payloadImage = urlValue;
             }
             const payload = {
               title: document.getElementById("modalEditServiceTitle").value.trim(),
@@ -1574,6 +1942,23 @@ async function renderAdmin() {
             }
           }
         });
+        const deleteBtn = document.getElementById("modalEditServiceImageDeleteBtn");
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", () => {
+            deleteBtn.dataset.remove = "1";
+            const urlInput = document.getElementById("modalEditServiceImageUrl");
+            const fileInput = document.getElementById("modalEditServiceImageFile");
+            if (urlInput) urlInput.value = "";
+            if (fileInput) fileInput.value = "";
+          });
+        }
+        const clearUrlBtn = document.getElementById("clearModalEditServiceImageUrlBtn");
+        const urlInput = document.getElementById("modalEditServiceImageUrl");
+        if (clearUrlBtn && urlInput) {
+          clearUrlBtn.addEventListener("click", () => {
+            urlInput.value = "";
+          });
+        }
       });
     });
 

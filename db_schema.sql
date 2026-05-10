@@ -1,13 +1,31 @@
-CREATE DATABASE IF NOT EXISTS barber_shop_db;
+﻿CREATE DATABASE IF NOT EXISTS barber_shop_db;
 USE barber_shop_db;
 
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(13) UNIQUE,
   passwordHash VARCHAR(255) NOT NULL,
+  emailVerified BOOLEAN DEFAULT FALSE,
+  emailVerifyCodeHash VARCHAR(255),
+  emailVerifyCodeExpires DATETIME,
+  resetCodeHash VARCHAR(255),
+  resetCodeExpires DATETIME,
   avatarUrl MEDIUMTEXT,
+  avatarData LONGTEXT,
   role ENUM('user', 'admin') DEFAULT 'user',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  phone VARCHAR(13) UNIQUE,
+  passwordHash VARCHAR(255) NOT NULL,
+  verifyCodeHash VARCHAR(255) NOT NULL,
+  verifyCodeExpires DATETIME NOT NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -18,6 +36,7 @@ CREATE TABLE IF NOT EXISTS services (
   price DECIMAL(10, 2) NOT NULL,
   durationMin INT DEFAULT 60,
   imageUrl MEDIUMTEXT,
+  imageData LONGTEXT,
   category VARCHAR(100),
   isPopular BOOLEAN DEFAULT FALSE,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -31,6 +50,7 @@ CREATE TABLE IF NOT EXISTS barbers (
   rating DECIMAL(3, 2) DEFAULT 5.00,
   bio TEXT,
   imageUrl MEDIUMTEXT,
+  imageData LONGTEXT,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -83,50 +103,3 @@ CREATE TABLE IF NOT EXISTS reviews (
   FOREIGN KEY (barberId) REFERENCES barbers(id) ON DELETE CASCADE
 );
 
-INSERT INTO services (title, description, price, category, isPopular)
-SELECT 'Классическая стрижка', 'Аккуратная форма и стиль под ваш образ.', 40.00, 'Стрижки', TRUE
-WHERE NOT EXISTS (SELECT 1 FROM services WHERE title = 'Классическая стрижка');
-
-INSERT INTO services (title, description, price, category, isPopular)
-SELECT 'Бритье опасной бритвой', 'Традиционное бритье с горячим полотенцем.', 35.00, 'Бритье', TRUE
-WHERE NOT EXISTS (SELECT 1 FROM services WHERE title = 'Бритье опасной бритвой');
-
-INSERT INTO services (title, description, price, category, isPopular)
-SELECT 'Комплекс стрижка + борода', 'Полный мужской grooming за один визит.', 65.00, 'Комплексы', TRUE
-WHERE NOT EXISTS (SELECT 1 FROM services WHERE title = 'Комплекс стрижка + борода');
-
-INSERT INTO barbers (name, specialty, experienceYears, rating, bio)
-SELECT 'Артем Соколов', 'Fade / Textured Crop', 7, 4.9, 'Специалист по современным мужским стрижкам.'
-WHERE NOT EXISTS (SELECT 1 FROM barbers WHERE name = 'Артем Соколов');
-
-INSERT INTO barbers (name, specialty, experienceYears, rating, bio)
-SELECT 'Максим Руденко', 'Classic / Beard', 10, 4.8, 'Классика барбершопа и работа с бородой.'
-WHERE NOT EXISTS (SELECT 1 FROM barbers WHERE name = 'Максим Руденко');
-
-INSERT IGNORE INTO barber_services (barberId, serviceId)
-SELECT b.id, s.id
-FROM barbers b
-JOIN services s ON s.title IN ('Классическая стрижка', 'Комплекс стрижка + борода')
-WHERE b.name = 'Артем Соколов';
-
-INSERT IGNORE INTO barber_services (barberId, serviceId)
-SELECT b.id, s.id
-FROM barbers b
-JOIN services s ON s.title IN ('Бритье опасной бритвой', 'Комплекс стрижка + борода')
-WHERE b.name = 'Максим Руденко';
-
-INSERT INTO reviews (barberId, authorName, rating, text)
-SELECT b.id, 'Илья', 5, 'Отличная работа и точное попадание в образ.'
-FROM barbers b
-WHERE b.name = 'Артем Соколов'
-  AND NOT EXISTS (
-    SELECT 1 FROM reviews r WHERE r.barberId = b.id AND r.authorName = 'Илья'
-  );
-
-INSERT INTO reviews (barberId, authorName, rating, text)
-SELECT b.id, 'Сергей', 5, 'Профессионально, быстро и очень аккуратно.'
-FROM barbers b
-WHERE b.name = 'Максим Руденко'
-  AND NOT EXISTS (
-    SELECT 1 FROM reviews r WHERE r.barberId = b.id AND r.authorName = 'Сергей'
-  );

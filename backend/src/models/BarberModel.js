@@ -1,5 +1,14 @@
 const pool = require('../config/db');
 
+const isDataImage = (value) => typeof value === 'string' && value.startsWith('data:image/');
+const mapBarberImage = (row) => {
+  if (!row) return row;
+  const normalized = { ...row };
+  normalized.imageUrl = normalized.imageData || normalized.imageUrl || null;
+  delete normalized.imageData;
+  return normalized;
+};
+
 class Barber {
   static async findAll(filters = {}) {
     let sql = 'SELECT * FROM barbers';
@@ -38,12 +47,12 @@ class Barber {
     }
 
     const [rows] = await pool.query(sql, values);
-    return rows;
+    return rows.map(mapBarberImage);
   }
 
   static async findById(id) {
     const [rows] = await pool.query('SELECT * FROM barbers WHERE id = ?', [id]);
-    return rows[0];
+    return mapBarberImage(rows[0]);
   }
 
   static async findServices(barberId) {
@@ -55,7 +64,11 @@ class Barber {
        ORDER BY s.title ASC`,
       [barberId]
     );
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      imageUrl: row.imageData || row.imageUrl || null,
+      imageData: undefined
+    }));
   }
 
   static async findReviews(barberId) {
@@ -71,21 +84,25 @@ class Barber {
 
   static async create(data) {
     const { name, specialty, experienceYears, rating, bio, imageUrl } = data;
+    const imageData = isDataImage(imageUrl) ? imageUrl : null;
+    const imageLink = imageData ? null : imageUrl || null;
     const [result] = await pool.query(
-      `INSERT INTO barbers (name, specialty, experienceYears, rating, bio, imageUrl)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, specialty || null, Number(experienceYears) || 0, Number(rating) || 5, bio || null, imageUrl || null]
+      `INSERT INTO barbers (name, specialty, experienceYears, rating, bio, imageUrl, imageData)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, specialty || null, Number(experienceYears) || 0, Number(rating) || 5, bio || null, imageLink, imageData]
     );
     return result.insertId;
   }
 
   static async update(id, data) {
     const { name, specialty, experienceYears, rating, bio, imageUrl } = data;
+    const imageData = isDataImage(imageUrl) ? imageUrl : null;
+    const imageLink = imageData ? null : imageUrl || null;
     const [result] = await pool.query(
       `UPDATE barbers
-       SET name = ?, specialty = ?, experienceYears = ?, rating = ?, bio = ?, imageUrl = ?
+       SET name = ?, specialty = ?, experienceYears = ?, rating = ?, bio = ?, imageUrl = ?, imageData = ?
        WHERE id = ?`,
-      [name, specialty || null, Number(experienceYears) || 0, Number(rating) || 5, bio || null, imageUrl || null, id]
+      [name, specialty || null, Number(experienceYears) || 0, Number(rating) || 5, bio || null, imageLink, imageData, id]
     );
     return result.affectedRows > 0;
   }

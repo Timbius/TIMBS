@@ -1,5 +1,14 @@
 const pool = require('../config/db');
 
+const isDataImage = (value) => typeof value === 'string' && value.startsWith('data:image/');
+const mapServiceImage = (row) => {
+  if (!row) return row;
+  const normalized = { ...row };
+  normalized.imageUrl = normalized.imageData || normalized.imageUrl || null;
+  delete normalized.imageData;
+  return normalized;
+};
+
 class Service {
   static async findAll(filters = {}) {
     let sql = 'SELECT s.* FROM services s';
@@ -56,7 +65,7 @@ class Service {
     const [rows] = await pool.query(sql, dataValues);
     const [countRows] = await pool.query(countSql, values);
     return {
-      items: rows,
+      items: rows.map(mapServiceImage),
       page,
       limit,
       total: countRows[0]?.total || 0
@@ -68,24 +77,27 @@ class Service {
       'SELECT * FROM services WHERE isPopular = TRUE ORDER BY createdAt DESC LIMIT ?',
       [limit]
     );
-    return rows;
+    return rows.map(mapServiceImage);
   }
 
   static async findById(id) {
     const [rows] = await pool.query('SELECT * FROM services WHERE id = ?', [id]);
-    return rows[0];
+    return mapServiceImage(rows[0]);
   }
 
   static async create(serviceData) {
     const { title, description, price, durationMin, imageUrl, category, isPopular } = serviceData;
+    const imageData = isDataImage(imageUrl) ? imageUrl : null;
+    const imageLink = imageData ? null : imageUrl || null;
     const [result] = await pool.query(
-      'INSERT INTO services (title, description, price, durationMin, imageUrl, category, isPopular) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO services (title, description, price, durationMin, imageUrl, imageData, category, isPopular) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         title,
         description || null,
         price,
         Number(durationMin) || 60,
-        imageUrl || null,
+        imageLink,
+        imageData,
         category || null,
         Boolean(isPopular)
       ]
@@ -95,16 +107,19 @@ class Service {
 
   static async update(id, serviceData) {
     const { title, description, price, durationMin, imageUrl, category, isPopular } = serviceData;
+    const imageData = isDataImage(imageUrl) ? imageUrl : null;
+    const imageLink = imageData ? null : imageUrl || null;
     const [result] = await pool.query(
       `UPDATE services
-       SET title = ?, description = ?, price = ?, durationMin = ?, imageUrl = ?, category = ?, isPopular = ?
+       SET title = ?, description = ?, price = ?, durationMin = ?, imageUrl = ?, imageData = ?, category = ?, isPopular = ?
        WHERE id = ?`,
       [
         title,
         description || null,
         price,
         Number(durationMin) || 60,
-        imageUrl || null,
+        imageLink,
+        imageData,
         category || null,
         Boolean(isPopular),
         id
@@ -128,7 +143,7 @@ class Service {
        LIMIT 20`,
       [q, q, q]
     );
-    return rows;
+    return rows.map(mapServiceImage);
   }
 
   static async linkToBarbers(serviceId, barberIds = []) {
@@ -148,7 +163,11 @@ class Service {
        ORDER BY b.rating DESC, b.experienceYears DESC`,
       [serviceId]
     );
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      imageUrl: row.imageData || row.imageUrl || null,
+      imageData: undefined
+    }));
   }
 }
 

@@ -51,6 +51,73 @@ async function initSchema() {
   if (!avatarRows[0]?.cnt) {
     await pool.query('ALTER TABLE users ADD COLUMN avatarUrl MEDIUMTEXT');
   }
+  const [avatarDataRows] = await pool.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND COLUMN_NAME = 'avatarData'`
+  );
+  if (!avatarDataRows[0]?.cnt) {
+    await pool.query('ALTER TABLE users ADD COLUMN avatarData LONGTEXT NULL');
+  }
+
+  const [phoneRows] = await pool.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND COLUMN_NAME = 'phone'`
+  );
+
+  if (!phoneRows[0]?.cnt) {
+    await pool.query('ALTER TABLE users ADD COLUMN phone VARCHAR(13) NULL');
+  }
+
+  await pool.query('ALTER TABLE users MODIFY COLUMN phone VARCHAR(13) NULL');
+
+  const userExtraColumns = [
+    { name: 'emailVerified', sql: "ALTER TABLE users ADD COLUMN emailVerified BOOLEAN DEFAULT FALSE" },
+    { name: 'emailVerifyCodeHash', sql: 'ALTER TABLE users ADD COLUMN emailVerifyCodeHash VARCHAR(255) NULL' },
+    { name: 'emailVerifyCodeExpires', sql: 'ALTER TABLE users ADD COLUMN emailVerifyCodeExpires DATETIME NULL' },
+    { name: 'resetCodeHash', sql: 'ALTER TABLE users ADD COLUMN resetCodeHash VARCHAR(255) NULL' },
+    { name: 'resetCodeExpires', sql: 'ALTER TABLE users ADD COLUMN resetCodeExpires DATETIME NULL' }
+  ];
+  for (const column of userExtraColumns) {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS cnt
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'users'
+         AND COLUMN_NAME = ?`,
+      [column.name]
+    );
+    if (!rows[0]?.cnt) await pool.query(column.sql);
+  }
+
+  const [phoneUniqueRows] = await pool.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND INDEX_NAME = 'uniq_user_phone'`
+  );
+  if (!phoneUniqueRows[0]?.cnt) {
+    await pool.query('ALTER TABLE users ADD UNIQUE KEY uniq_user_phone (phone)');
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pending_registrations (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      phone VARCHAR(13) UNIQUE,
+      passwordHash VARCHAR(255) NOT NULL,
+      verifyCodeHash VARCHAR(255) NOT NULL,
+      verifyCodeExpires DATETIME NOT NULL,
+      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   const reviewColumns = [
     { name: 'recordId', sql: 'ALTER TABLE reviews ADD COLUMN recordId INT NULL' },
@@ -89,6 +156,26 @@ async function initSchema() {
   await pool.query('ALTER TABLE reviews MODIFY COLUMN text TEXT NULL');
   await pool.query('ALTER TABLE services MODIFY COLUMN imageUrl MEDIUMTEXT NULL');
   await pool.query('ALTER TABLE barbers MODIFY COLUMN imageUrl MEDIUMTEXT NULL');
+  const [serviceImageDataRows] = await pool.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'services'
+       AND COLUMN_NAME = 'imageData'`
+  );
+  if (!serviceImageDataRows[0]?.cnt) {
+    await pool.query('ALTER TABLE services ADD COLUMN imageData LONGTEXT NULL');
+  }
+  const [barberImageDataRows] = await pool.query(
+    `SELECT COUNT(*) AS cnt
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'barbers'
+       AND COLUMN_NAME = 'imageData'`
+  );
+  if (!barberImageDataRows[0]?.cnt) {
+    await pool.query('ALTER TABLE barbers ADD COLUMN imageData LONGTEXT NULL');
+  }
 }
 
 module.exports = initSchema;

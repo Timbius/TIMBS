@@ -52,7 +52,7 @@ html {
 }
 
 .home-preview {
-  max-width: 980px;
+  max-width: 860px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -80,16 +80,15 @@ html {
 }
 
 .catalog-topbar {
-  position: sticky;
-  top: 74px;
+  position: static;
   z-index: 12;
   border-radius: 18px;
   border: none;
   background: rgba(18, 24, 33, 0.42);
   backdrop-filter: blur(8px);
-  padding: 14px;
+  padding: 10px 12px;
   margin-bottom: 18px;
-  max-width: 980px;
+  max-width: 860px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -107,11 +106,33 @@ html {
 .catalog-sub {
   text-align: center;
   color: #d7dde7;
-  margin: 8px 0 10px;
+  margin: 4px 0 8px;
 }
 
 .catalog-toolbar {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+/* Center search/filter blocks and keep comfortable width */
+.catalog-topbar .catalog-toolbar,
+.barbers-search-form,
+#globalSearchForm {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.barbers-search-form .field,
+#globalSearchForm .field {
+  min-height: 42px;
+}
+
+.barbers-search-form .btn,
+#globalSearchForm .btn {
+  min-height: 42px;
+  padding: 8px 14px;
 }
 
 .catalog-summary {
@@ -125,8 +146,37 @@ html {
   gap: 10px;
 }
 
+.catalog-filter-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.catalog-filter-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.catalog-filter-prices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.catalog-filter-center {
+  grid-column: 1 / -1;
+}
+
+.catalog-filter-submit {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+}
+
 .catalog-admin-wrap {
-  max-width: 980px;
+  max-width: 860px;
   margin: 0 auto 16px;
 }
 
@@ -142,7 +192,7 @@ html {
   background: transparent;
   border: none;
   box-shadow: none;
-  max-width: 980px;
+  max-width: 860px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -154,9 +204,43 @@ html {
 }
 
 .services-vertical .service-card {
-  width: min(100%, 980px);
+  width: min(100%, 860px);
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Keep home service cards neat and consistent */
+.home-preview .services {
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.home-preview .service-card {
+  min-height: 220px;
+}
+
+/* Admin edit/create modal should not be squeezed */
+.modal-card-admin {
+  width: min(760px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+}
+
+.modal-card-admin .catalog-grid-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+}
+
+.modal-card-admin .area {
+  min-height: 132px;
+}
+
+.image-delete-btn {
+  min-height: 40px;
+  padding: 8px 12px;
 }
 
 .style-strip {
@@ -189,12 +273,46 @@ html {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(234, 239, 246, 0.66));
 }
 
+/* Admin sections: compact, collapsible and scrollable */
+.admin-section {
+  margin-top: 10px;
+  border-radius: 14px;
+}
+
+.admin-section > summary.section-head {
+  cursor: pointer;
+  margin-bottom: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.admin-list {
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px 2px 2px;
+}
+
+.admin-list .service-card {
+  padding: 12px;
+}
+
 @media (max-width: 980px) {
   .catalog-toolbar {
     grid-template-columns: 1fr;
   }
 
+  .catalog-filter-layout,
+  .catalog-filter-inline,
+  .catalog-filter-prices {
+    grid-template-columns: 1fr;
+  }
+
   .catalog-admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-card-admin .catalog-grid-4 {
     grid-template-columns: 1fr;
   }
 

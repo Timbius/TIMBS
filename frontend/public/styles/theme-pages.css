@@ -95,16 +95,16 @@
 
 .service-card {
   display: grid;
-  gap: 14px;
-  padding: 22px;
+  gap: 10px;
+  padding: 16px;
   border-radius: var(--r2);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(234, 239, 246, 0.66));
 }
 
 .service-card h3 {
-  font-size: 30px;
-  line-height: 1.1;
+  font-size: 23px;
+  line-height: 1.2;
 }
 
 .meta {
@@ -161,12 +161,12 @@
 
 .modal-card {
   position: relative;
-  width: min(520px, 100%);
-  border-radius: 24px;
+  width: min(460px, 100%);
+  border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(252, 254, 255, 0.95);
   box-shadow: 0 34px 90px rgba(16, 23, 33, 0.36);
-  padding: 28px;
+  padding: 20px;
   animation: modalRise 0.28s ease;
 }
 
@@ -177,7 +177,7 @@
 }
 
 .modal-head h2 {
-  font-size: clamp(34px, 6vw, 48px);
+  font-size: clamp(26px, 4vw, 36px);
   line-height: 1;
 }
 

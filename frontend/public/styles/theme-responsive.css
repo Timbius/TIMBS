@@ -13,5 +13,8 @@
   .nav-main { min-width: 94px; }
   .btn, .btn-link { width: 100%; }
   .service-actions { width: 100%; }
-  .service-card h3 { font-size: 26px; }
+  .service-card h3 { font-size: 20px; }
+  .catalog-topbar { position: static; }
+  .catalog-logo { font-size: clamp(28px, 10vw, 40px); }
+  .modal-card-admin { width: calc(100vw - 20px); max-height: calc(100vh - 20px); }
 }

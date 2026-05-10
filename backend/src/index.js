@@ -38,8 +38,16 @@ app.get('/api/health', (req, res) => {
 async function startServer() {
   try {
     await initSchema();
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+    });
+    server.on('error', (error) => {
+      if (error && error.code === 'EADDRINUSE') {
+        console.error(`Порт ${PORT} уже занят. Остановите старый процесс Node и запустите сервер снова.`);
+      } else {
+        console.error('Ошибка запуска HTTP-сервера:', error.message);
+      }
+      process.exit(1);
     });
   } catch (error) {
     console.error('Failed to initialize database schema:', error.message);

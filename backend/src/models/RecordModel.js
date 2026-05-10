@@ -1,6 +1,21 @@
 const pool = require('../config/db');
 
 class Record {
+  static async hasTimeConflict(barberId, appointmentAt, excludeId = null) {
+    const baseSql = `
+      SELECT id
+      FROM records
+      WHERE barberId = ?
+        AND status = 'active'
+        AND ABS(TIMESTAMPDIFF(MINUTE, appointmentAt, ?)) < 30
+    `;
+    const params = [barberId, appointmentAt];
+    const sql = excludeId ? `${baseSql} AND id <> ? LIMIT 1` : `${baseSql} LIMIT 1`;
+    if (excludeId) params.push(excludeId);
+    const [rows] = await pool.query(sql, params);
+    return Boolean(rows[0]);
+  }
+
   static async create({ userId, barberId, serviceId, appointmentAt, comment }) {
     const [result] = await pool.query(
       `INSERT INTO records (userId, barberId, serviceId, appointmentAt, comment, status)

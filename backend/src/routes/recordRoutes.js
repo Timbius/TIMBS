@@ -15,10 +15,18 @@ const {
 
 const router = express.Router();
 
+const validateAppointment = body().custom((_, { req }) => {
+  const value = req.body.appointmentAt || req.body.date;
+  if (!value) throw new Error('appointmentAt or date is required');
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new Error('appointmentAt/date must be valid ISO date');
+  return true;
+});
+
 const recordValidation = [
   body('barberId').isInt({ min: 1 }).withMessage('barberId is required'),
   body('serviceId').isInt({ min: 1 }).withMessage('serviceId is required'),
-  body('appointmentAt').isISO8601().withMessage('appointmentAt must be ISO date')
+  validateAppointment
 ];
 
 router.get('/schedule', getSchedule);

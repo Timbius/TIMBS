@@ -33,7 +33,7 @@ const createReview = async (req, res) => {
     res.status(201).json({ message: 'Отзыв сохранен', reviewId: id });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430' });
   }
 };
 
@@ -62,7 +62,7 @@ const updateReview = async (req, res) => {
     res.json({ message: 'Отзыв обновлен' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430' });
   }
 };
 
@@ -79,7 +79,7 @@ const deleteReview = async (req, res) => {
     res.json({ message: 'Отзыв удален' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430' });
   }
 };
 
@@ -89,7 +89,7 @@ const getMyReviews = async (req, res) => {
     res.json(reviews);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430' });
   }
 };
 

@@ -53,6 +53,8 @@ const money = (v) => `${new Intl.NumberFormat("be-BY").format(Number(v) || 0)} B
 const setSession = (data) => {
   state.auth.token = data.token;
   state.auth.user = data.user;
+  sessionStorage.setItem("token", data.token);
+  sessionStorage.setItem("user", JSON.stringify(data.user));
 };
 
 const clearSession = () => {
@@ -162,6 +164,15 @@ function switchAuthMode(mode) {
 }
 
 async function hydrateAuthUser() {
+  if (!isAuth()) {
+    state.auth.token = sessionStorage.getItem("token") || "";
+    try {
+      state.auth.user = JSON.parse(sessionStorage.getItem("user") || "null");
+    } catch {
+      state.auth.user = null;
+    }
+  }
+
   if (!isAuth()) return;
   try {
     const me = await api("/auth/me");

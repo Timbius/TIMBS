@@ -23,12 +23,10 @@ function run(name, command, args, cwd) {
   return child;
 }
 
-const api = run("api", "npm", ["run", "start"], path.join(root, "backend"));
-const web = run("web", "npx", ["serve", "frontend/public", "-s", "-l", "3000"], root);
+const api = run("app", "npm", ["run", "start"], path.join(root, "backend"));
 
 function shutdown() {
   if (!api.killed) api.kill();
-  if (!web.killed) web.kill();
   process.exit(0);
 }
 
@@ -36,5 +34,5 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 console.log("Dev started in this terminal:");
-console.log("WEB: http://localhost:3000");
-console.log("API: http://localhost:5000/api/health");
+console.log("APP: http://localhost:3000");
+console.log("API: http://localhost:3000/api/health");

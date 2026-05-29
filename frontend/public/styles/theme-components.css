@@ -60,3 +60,6 @@
 .service-detail-description { font-size: 19px; max-width: 72ch; }
 .service-detail-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+#loadMoreBtn {
+    margin-top: 40px;
+  }

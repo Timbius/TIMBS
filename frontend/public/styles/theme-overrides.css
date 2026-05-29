@@ -197,6 +197,10 @@ html {
   margin-right: auto;
 }
 
+.catalog-list-wrap .center-row {
+  margin-top: 18px;
+}
+
 .services-vertical {
   display: flex !important;
   flex-direction: column;
@@ -219,6 +223,10 @@ html {
 
 .home-preview .service-card {
   min-height: 220px;
+}
+
+.favorite-text-card {
+  min-height: auto;
 }
 
 /* Admin edit/create modal should not be squeezed */

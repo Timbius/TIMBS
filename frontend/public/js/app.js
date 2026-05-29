@@ -1,4 +1,4 @@
-﻿const API_URL = "http://localhost:5000/api";
+﻿const API_URL = "/api";
 
 const state = {
   auth: {
@@ -39,6 +39,12 @@ const getPath = () => {
   const p = window.location.pathname.replace(/\/+$/, "");
   return p || "/";
 };
+const todayISO = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+};
+const isPastDateValue = (value) => Boolean(value && value < todayISO());
 
 const esc = (v) =>
   String(v ?? "")
@@ -90,7 +96,7 @@ async function api(path, options = {}) {
   try {
     res = await fetch(`${API_URL}${path}`, { ...options, headers });
   } catch {
-    throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен на http://localhost:5000");
+    throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен.");
   }
 
   let data = null;
@@ -518,6 +524,23 @@ function serviceCard(item, admin = false, showDescription = true) {
         <a href="/catalog/${item.id}" class="btn-link secondary" data-link>Подробнее</a>
         ${favoriteButton(item)}
         ${admin ? `<button class="btn danger" type="button" data-delete-id="${item.id}">Удалить</button>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+function favoriteServiceRow(item) {
+  return `
+    <article class="service-card favorite-text-card reveal">
+      <div class="meta">
+        <span class="pill">${esc(item.category || "Услуга")}</span>
+        ${item.isPopular ? `<span class="pill">Популярно</span>` : ""}
+      </div>
+      <h3>${esc(item.title)}</h3>
+      <div class="price">${money(item.price)}</div>
+      <div class="service-actions">
+        <a href="/catalog/${item.id}" class="btn-link secondary" data-link>Подробнее</a>
+        ${favoriteButton(item)}
       </div>
     </article>
   `;
@@ -1025,7 +1048,7 @@ async function renderProfile() {
 
       <details class="home-preview" open>
         <summary class="section-head"><h2>Избранные услуги (${myFavorites.length})</h2></summary>
-        <div class="services">${myFavorites.length ? myFavorites.map((item) => serviceCard(item)).join("") : `<div class="empty"><h3>Избранного пока нет</h3></div>`}</div>
+        <div class="services services-vertical">${myFavorites.length ? myFavorites.map((item) => favoriteServiceRow(item)).join("") : `<div class="empty"><h3>Избранного пока нет</h3></div>`}</div>
       </details>
 
       <details class="home-preview">
@@ -1309,7 +1332,8 @@ async function renderRecords() {
 
     const selected = { slot: "" };
     const dateInput = document.getElementById("recordDate");
-    dateInput.value = new Date().toISOString().slice(0, 10);
+    dateInput.min = todayISO();
+    dateInput.value = todayISO();
 
     const toMin = (hhmm) => {
       const [h, m] = hhmm.split(":").map(Number);
@@ -1326,6 +1350,10 @@ async function renderRecords() {
       selected.slot = "";
       if (!barberId || !date) {
         slotsRoot.innerHTML = `<p class="sub">Сначала выберите мастера и дату.</p>`;
+        return;
+      }
+      if (isPastDateValue(date)) {
+        slotsRoot.innerHTML = `<p class="sub">Для прошедшей даты свободные слоты не показываются.</p>`;
         return;
       }
 
@@ -2012,6 +2040,30 @@ function renderNotFound(text) {
 async function renderRoute() {
   updateNav();
   const path = getPath();
+  const authOnly = new Set(["/profile", "/records"]);
+  const guestOnly = new Set(["/auth/login", "/auth/register"]);
+
+  if (guestOnly.has(path) && isAuth()) {
+    history.replaceState({}, "", "/profile");
+    updateNav();
+    return renderProfile();
+  }
+
+  if (authOnly.has(path) && !isAuth()) {
+    history.replaceState({}, "", "/");
+    await renderHome();
+    openAuthModal("login");
+    return;
+  }
+
+  if (path === "/admin" && !isAuth()) {
+    history.replaceState({}, "", "/");
+    await renderHome();
+    openAuthModal("login");
+    return;
+  }
+
+  if (path === "/admin" && !isAdmin()) return renderForbidden();
 
   if (path === "/") return renderHome();
   if (path === "/auth/login") {

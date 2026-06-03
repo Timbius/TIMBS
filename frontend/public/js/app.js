@@ -501,7 +501,11 @@ function renderAuthModal() {
 
 function favoriteButton(item) {
   const isFav = state.favorites.has(Number(item.id));
-  return `<button class="btn-link ghost fav-btn" type="button" data-fav-id="${item.id}">${isFav ? "★ В избранном" : "☆ В избранное"}</button>`;
+  return `<button class="btn-link ghost fav-btn" type="button" data-fav-id="${item.id}">${favoriteButtonText(isFav)}</button>`;
+}
+
+function favoriteButtonText(isFav) {
+  return isFav ? "★ В избранном" : "☆ В избранное";
 }
 
 function serviceCard(item, admin = false, showDescription = true) {
@@ -596,11 +600,20 @@ function bindEnrollButtons() {
 function bindFavoriteButtons() {
   document.querySelectorAll("[data-fav-id]").forEach((button) => {
     button.addEventListener("click", async () => {
+      const serviceId = Number(button.dataset.favId);
       try {
-        await toggleFavorite(button.dataset.favId);
-        renderRoute();
+        button.disabled = true;
+        await toggleFavorite(serviceId);
+        const isFav = state.favorites.has(serviceId);
+        document.querySelectorAll(`[data-fav-id="${serviceId}"]`).forEach((btn) => {
+          btn.textContent = favoriteButtonText(isFav);
+        });
       } catch (error) {
         alert(error.message);
+      } finally {
+        document.querySelectorAll(`[data-fav-id="${serviceId}"]`).forEach((btn) => {
+          btn.disabled = false;
+        });
       }
     });
   });
@@ -905,9 +918,16 @@ async function renderBarberDetail(id) {
       api(`/barbers/${id}/reviews`),
     ]);
 
-    const imageBlock = barber.imageUrl
-      ? `<img class="barber-detail-image" src="${esc(barber.imageUrl)}" alt="${esc(barber.name)}" onerror="this.onerror=null;this.src='/assets/barber.jpg';" />`
-      : `<div class="barber-detail-image barber-detail-image-empty">${esc((barber.name || "M").slice(0, 1).toUpperCase())}</div>`;
+    const barberInitial = esc((barber.name || "M").slice(0, 1).toUpperCase());
+    const imageBlock = `
+      <div class="barber-detail-media">
+        ${
+          barber.imageUrl
+            ? `<img class="barber-detail-image" src="${esc(barber.imageUrl)}" alt="${esc(barber.name)}" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=&quot;barber-detail-image-empty&quot;>${barberInitial}</div>';" />`
+            : `<div class="barber-detail-image-empty">${barberInitial}</div>`
+        }
+      </div>
+    `;
 
     app.innerHTML = `
       <section class="detail-wrap card panel reveal barber-detail-card">
